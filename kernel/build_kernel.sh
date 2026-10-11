@@ -20,7 +20,7 @@ fi
 PATCHDIR="$ROOT/kernel/patches"
 cd "$K"
 
-for p in "$PATCHDIR"/0001-*.patch "$PATCHDIR"/01.*.patch "$PATCHDIR"/02.*.patch; do
+for p in "$PATCHDIR"/0000-*.patch "$PATCHDIR"/0001-*.patch "$PATCHDIR"/01.*.patch "$PATCHDIR"/02.*.patch; do
   [ -f "$p" ] || continue
   if patch -p1 --dry-run < "$p" >/dev/null 2>&1; then
     echo "applying $(basename $p)"
