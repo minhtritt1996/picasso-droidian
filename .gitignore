@@ -1,0 +1,12 @@
+downloads/
+output/*.img
+kernel/
+toolchain/
+backup_picasso/
+fw/
+hgabt/
+halium-boot/
+*.tgz
+*.zip
+*.dtb
+out/

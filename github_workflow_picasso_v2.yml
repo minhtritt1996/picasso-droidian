@@ -1,0 +1,190 @@
+name: Build Halium Boot Image for Redmi K30 5G (Picasso)
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  build-halium-boot:
+    name: Compile Kernel and Pack Boot Image
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install Build Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            bc bison build-essential flex libssl-dev libelf-dev \
+            clang lld llvm gcc-aarch64-linux-gnu \
+            python3 python3-pip git wget cpio kmod
+
+          pip3 install --upgrade pip
+          pip3 install mkbootimg
+
+      - name: Clone LineageOS 18.1 Kernel (SM7250 / Picasso)
+        run: |
+          git clone --depth=1 -b lineage-18.1 \
+            https://github.com/LineageOS/android_kernel_xiaomi_sm7250.git kernel
+
+      - name: Configure Kernel Defconfig
+        run: |
+          cd kernel
+          export ARCH=arm64
+          if [ -f "arch/arm64/configs/vendor/picasso_user_defconfig" ]; then
+            make O=out ARCH=arm64 vendor/picasso_user_defconfig
+          else
+            make O=out ARCH=arm64 vendor/lito-perf_defconfig
+          fi
+
+      - name: Patch Kernel Config for Halium & Droidian
+        run: |
+          cd kernel
+          SC="scripts/config"
+          CFG="out/.config"
+
+          # Android Binder & IPC (Kernel 4.19 legacy binder)
+          $SC --file "$CFG" --enable CONFIG_ANDROID
+          $SC --file "$CFG" --enable CONFIG_ANDROID_BINDER_IPC
+          $SC --file "$CFG" --set-str CONFIG_ANDROID_BINDER_DEVICES "binder,hwbinder,vndbinder"
+          $SC --file "$CFG" --enable CONFIG_ASHMEM
+
+          # Namespaces (Required for LXC Container)
+          $SC --file "$CFG" --enable CONFIG_NAMESPACES
+          $SC --file "$CFG" --enable CONFIG_UTS_NS
+          $SC --file "$CFG" --enable CONFIG_IPC_NS
+          $SC --file "$CFG" --enable CONFIG_USER_NS
+          $SC --file "$CFG" --enable CONFIG_PID_NS
+          $SC --file "$CFG" --enable CONFIG_NET_NS
+
+          # Cgroups
+          $SC --file "$CFG" --enable CONFIG_CGROUPS
+          $SC --file "$CFG" --enable CONFIG_CPUSETS
+          $SC --file "$CFG" --enable CONFIG_CGROUP_DEVICE
+          $SC --file "$CFG" --enable CONFIG_CGROUP_FREEZER
+          $SC --file "$CFG" --enable CONFIG_BLK_CGROUP
+          $SC --file "$CFG" --enable CONFIG_CGROUP_PERF
+
+          # AppArmor & Security
+          $SC --file "$CFG" --enable CONFIG_SECURITY
+          $SC --file "$CFG" --enable CONFIG_SECURITY_APPARMOR
+          $SC --file "$CFG" --enable CONFIG_SECURITY_APPARMOR_HASH
+          $SC --file "$CFG" --enable CONFIG_DEFAULT_SECURITY_APPARMOR
+          $SC --file "$CFG" --set-str CONFIG_DEFAULT_SECURITY "apparmor"
+          $SC --file "$CFG" --set-val CONFIG_SECURITY_APPARMOR_BOOTPARAM_VALUE 1
+          $SC --file "$CFG" --set-val CONFIG_SECURITY_SELINUX_BOOTPARAM_VALUE 0
+          $SC --file "$CFG" --enable CONFIG_SECCOMP
+          $SC --file "$CFG" --enable CONFIG_SECURITYFS
+          $SC --file "$CFG" --enable CONFIG_SECURITY_NETWORK
+          $SC --file "$CFG" --enable CONFIG_SECURITY_PATH
+          $SC --file "$CFG" --enable CONFIG_AUDIT
+
+          # VT, IPC & Devtmpfs
+          $SC --file "$CFG" --enable CONFIG_VT
+          $SC --file "$CFG" --enable CONFIG_VT_CONSOLE
+          $SC --file "$CFG" --enable CONFIG_SYSVIPC
+          $SC --file "$CFG" --enable CONFIG_DEVTMPFS
+          $SC --file "$CFG" --enable CONFIG_DEVTMPFS_MOUNT
+          $SC --file "$CFG" --enable CONFIG_DEVPTS_MULTIPLE_INSTANCES
+
+          # Filesystem
+          $SC --file "$CFG" --enable CONFIG_TMPFS_XATTR
+          $SC --file "$CFG" --enable CONFIG_TMPFS_POSIX_ACL
+          $SC --file "$CFG" --enable CONFIG_AUTOFS4_FS
+          $SC --file "$CFG" --enable CONFIG_EXT4_FS_POSIX_ACL
+          $SC --file "$CFG" --enable CONFIG_EXT4_FS_SECURITY
+          $SC --file "$CFG" --enable CONFIG_FHANDLE
+          $SC --file "$CFG" --enable CONFIG_IKCONFIG
+          $SC --file "$CFG" --enable CONFIG_IKCONFIG_PROC
+          $SC --file "$CFG" --enable CONFIG_PSI
+
+          # Network & Container NAT
+          $SC --file "$CFG" --enable CONFIG_BRIDGE
+          $SC --file "$CFG" --enable CONFIG_VETH
+          $SC --file "$CFG" --enable CONFIG_MACVLAN
+          $SC --file "$CFG" --enable CONFIG_NF_NAT
+          $SC --file "$CFG" --enable CONFIG_IP_NF_NAT
+          $SC --file "$CFG" --enable CONFIG_IP_NF_IPTABLES
+          $SC --file "$CFG" --enable CONFIG_NF_CONNTRACK
+          $SC --file "$CFG" --enable CONFIG_NETFILTER_XT_MATCH_ADDRTYPE
+          $SC --file "$CFG" --enable CONFIG_NETFILTER_XT_MATCH_CONNTRACK
+          $SC --file "$CFG" --enable CONFIG_NETFILTER_XT_MATCH_MULTIPORT
+          $SC --file "$CFG" --enable CONFIG_NETFILTER_XT_MATCH_STATE
+          $SC --file "$CFG" --enable CONFIG_NETFILTER_XT_MATCH_PHYSDEV
+          $SC --file "$CFG" --enable CONFIG_NETFILTER_XT_TARGET_MARK
+          $SC --file "$CFG" --enable CONFIG_NETFILTER_XT_TARGET_CONNMARK
+          $SC --file "$CFG" --enable CONFIG_NETFILTER_XT_TARGET_LOG
+          $SC --file "$CFG" --enable CONFIG_IP_ADVANCED_ROUTER
+
+          # Disable Android low memory killer & paranoid network
+          $SC --file "$CFG" --disable CONFIG_ANDROID_LOW_MEMORY_KILLER
+          $SC --file "$CFG" --disable CONFIG_ANDROID_PARANOID_NETWORK
+          $SC --file "$CFG" --disable CONFIG_DEFAULT_SECURITY_SELINUX
+
+      - name: Compile Kernel Image & DTBs
+        run: |
+          cd kernel
+          export ARCH=arm64
+          export SUBARCH=arm64
+          make O=out ARCH=arm64 \
+               CC=clang \
+               CLANG_TRIPLE=aarch64-linux-gnu- \
+               CROSS_COMPILE=aarch64-linux-gnu- \
+               -j$(nproc) \
+               Image.gz dtbs
+
+      - name: Locate Picasso DTB
+        id: find_dtb
+        run: |
+          DTB=$(find kernel/out/arch/arm64/boot/dts/qcom -name "*picasso*.dtb" 2>/dev/null | head -n1 || true)
+          if [ -z "$DTB" ]; then
+            DTB=$(find kernel/out/arch/arm64/boot/dts/qcom -name "*lito*.dtb" 2>/dev/null | head -n1 || true)
+          fi
+          echo "Selected DTB: $DTB"
+          echo "dtb_path=$DTB" >> $GITHUB_OUTPUT
+
+      - name: Prepare Halium Generic Ramdisk
+        id: prepare_ramdisk
+        run: |
+          git clone --depth=1 https://github.com/Halium/halium-boot.git halium-boot-src
+          cd halium-boot-src
+          chmod +x ./build.sh || true
+          ./build.sh || true
+          RAMDISK=$(find . -name "*.cpio.gz" | head -n1)
+          cd ..
+          echo "ramdisk_path=halium-boot-src/$RAMDISK" >> $GITHUB_OUTPUT
+
+      - name: Pack Halium Boot Image (Header V2)
+        run: |
+          mkdir -p output
+          KERNEL="kernel/out/arch/arm64/boot/Image.gz"
+          DTB="${{ steps.find_dtb.outputs.dtb_path }}"
+          RAMDISK="${{ steps.prepare_ramdisk.outputs.ramdisk_path }}"
+
+          CMDLINE="console=ttyMSM0,115200n8 earlycon=msm_geni_serial,0x4a90000 androidboot.hardware=qcom androidboot.console=ttyMSM0 androidboot.memcg=1 lpm_levels.sleep_disabled=1 video=vfb:640x400,bpp=32,memsize=3072000 msm_rtb.filter=0x237 service_locator.enable=1 swiotlb=2048 androidboot.usbcontroller=a600000.dwc3 loop.max_part=7 androidboot.usbconfigfs=true androidboot.selinux=permissive"
+
+          mkbootimg \
+            --kernel "$KERNEL" \
+            --ramdisk "$RAMDISK" \
+            --dtb "$DTB" \
+            --base 0x00000000 \
+            --pagesize 4096 \
+            --kernel_offset 0x00008000 \
+            --ramdisk_offset 0x01000000 \
+            --tags_offset 0x00000100 \
+            --dtb_offset 0x01f00000 \
+            --header_version 2 \
+            --cmdline "$CMDLINE" \
+            -o output/halium-boot-picasso.img
+
+      - name: Upload Halium Boot Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: halium-boot-picasso
+          path: output/halium-boot-picasso.img
+          if-no-files-found: error
