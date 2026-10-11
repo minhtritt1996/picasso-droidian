@@ -41,3 +41,19 @@
   dtb 0x1f00000 + rec-picasso.dtb + cmdline in build_*.sh
 - Backups: ~/droidian/backup_picasso (persist/modem/efs), full ROM tgz in downloads/
 - Phone SSH: droidian@10.15.19.82 / root@10.15.19.82 (key), pw 1234
+
+## Update 2 - stability + root causes (same day, later)
+- 100s periodic SILENT resets root-caused to Android container startup path:
+  masked container = stable 9+ min; manual lxc-start = stable; systemd-managed
+  (notify/apex-wait/timeout-kill) = reset ~100s. apexd needs >90s to be ready.
+- Display blocker identified precisely (wlroots 0.17 caps): pixman renderer only
+  advertises DATA_PTR, DRM backend only DMABUF -> autocreate can never succeed.
+  HWC path runs but swap_buffers fails. ANY EGL/GBM attempt wedges kgsl -> SoC
+  watchdog reset. GPU (Adreno 620) needs proper fw/power sequencing work.
+- /dev/ion is 0600 (needs 71-android-gfx.rules in adaptation); binder OK.
+- a620_zap fw copied to /lib/firmware (from vendor) then removed again for tests.
+- Touch (Novatek SPI) works. Backlight rule works. SSH key auth works.
+- Modem boots (PIL ok), ofono chatters; cellular untested (blocked on container).
+- WiFi: no wlan netdev (driver/fw missing, todo).
+- Current phone state: lxc@android MASKED (stable base, no UI), phosh disabled,
+  hwcomposer wrapper untouched. DO NOT enable phosh/autostart until GPU sorted.
