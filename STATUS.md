@@ -77,3 +77,27 @@
   verify each step, avoid rapid-fire hardware probing).
 - Phone-side hacks now include: /etc/pulse/droid/*.xml (vendor copies),
   71-gfx rule still TODO (only chmod done), phosh drop-ins in flux.
+
+## Update 4 - reboot-hang root cause + boot image lessons
+- REBOOT HANG: `reboot` kills SSH instantly (network teardown first) but the
+  box often never resets. Root cause = UNKILLABLE D-state processes:
+  crashed `phoc` + `pulseaudio` wedged forever in `do_coredump`
+  (page-fault inside coredump path). systemd stop/SIGKILL cycles on them
+  forever -> shutdown never completes. Fixes applied on phone (persistent):
+  pulseaudio.service+socket MASKED (user), phosh.service MASKED (it was
+  pulled in via android-service@hwcomposer BindsTo despite disable),
+  kernel.core_pattern=|/bin/false via /etc/sysctl.d/99-nocore.conf.
+  NOTE: masking prevents NEW stuck procs; already-stuck ones die at boot.
+- BOOT IMAGE: custom images (bigger kernel 18.8MB + appended rec-picasso.dtb)
+  fall to fastboot. Stable = halium-boot-nolCDT.img (7fddb33d, header v2,
+  kernel 18.07MB, ramdisk @0x1000000, concatenated layout dtb_size=0).
+  Bigger kernel needs ramdisk_offset=0x134d000 but still failed to boot -
+  likely partition/bootloader size quirk. KEEP using fastboot flash for
+  recovery; /dev/disk/by-partlabel/boot writes verify OK by md5 but the
+  resulting image still would not boot (needs offline layout debug).
+- Kernel wishlist (for next build, layout permitting): MODVERSIONS off (done),
+  SIG_FORCE off (done), DYNAMIC_DEBUG=y (config reverted by olddefconfig
+  once - re-apply + verify auto.conf), needed to load 41 vendor audio/wifi
+  .ko (vermagic patched copies in /root/vmods on phone + /root/picasso/ko_patched).
+- Phone steady state now: lxc masked, phosh masked, pulse masked, ofono/MM
+  manual-start only, ADSP+bwdlan fw in /lib/firmware, 100%-charged.
