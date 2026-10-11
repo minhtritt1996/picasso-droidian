@@ -164,6 +164,7 @@ $SC --file "$CFG" --disable CONFIG_COMPAT_VDSO
 $SC --file "$CFG" --enable CONFIG_USB_CONFIGFS_RNDIS  # halium telnet rescue
 $SC --file "$CFG" --enable CONFIG_USB_CONFIGFS_ECM
 sed -i "s/# CONFIG_TOUCHSCREEN_NT36xxx_HOSTDL_SPI is not set/CONFIG_TOUCHSCREEN_NT36xxx_HOSTDL_SPI=y/" "$CFG"  # picasso novatek touch (scripts/config mishandles it)
+sed -i "s/# CONFIG_ION_SYSTEM_HEAP is not set/CONFIG_ION_SYSTEM_HEAP=y/" "$CFG"  # gralloc needs ION system heap on 4.19
 
 # --- Vô hiệu hóa các tính năng cản trở Linux userspace ---
 $SC --file "$CFG" --disable CONFIG_ANDROID_LOW_MEMORY_KILLER
