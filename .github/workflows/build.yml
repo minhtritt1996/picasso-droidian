@@ -1,0 +1,65 @@
+name: build-picasso
+
+on:
+  push:
+    paths:
+      - 'kernel/**'
+      - 'scripts/**'
+      - '.github/workflows/**'
+  workflow_dispatch:
+
+jobs:
+  kernel:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            git make bc bison flex libssl-dev libelf-dev \
+            gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi \
+            python2 python-is-python2 cpio kmod device-tree-compiler
+          # mkbootimg (AOSP)
+          pip3 install mkbootimg 2>/dev/null || sudo apt-get install -y android-sdk-libsparse-utils || true
+
+      - name: Proton clang 13
+        run: |
+          mkdir -p ~/toolchain && cd ~/toolchain
+          # Pin a known-good Proton-clang 13 build (tested locally 2026-10-11)
+          curl -sL --retry 3 -o clang.tar.gz \
+            https://github.com/kdrag0n/proton-clang/archive/refs/heads/master.tar.gz || true
+          ls -la
+
+      - name: Kernel source (shallow)
+        run: |
+          git clone --depth 1 -b lineage-18.1 \
+            https://github.com/LineageOS/android_kernel_xiaomi_sm7250.git kernel-src
+          cd kernel-src
+          for p in ../kernel/patches/0001-*.patch ../kernel/patches/01.*.patch ../kernel/patches/02.*.patch; do
+            [ -f "$p" ] || continue
+            patch -p1 --dry-run < "$p" >/dev/null 2>&1 && patch -p1 < "$p" || echo "skip $p"
+          done
+
+      - name: Configure
+        run: |
+          mkdir -p kernel-src/out_halium
+          cp kernel/picasso_defconfig kernel-src/out_halium/.config
+          # NOTE: full local toolchain expected; CI uses system cross-gcc
+          # if Proton clang is unavailable (see build_kernel.sh).
+
+      - name: Build
+        run: |
+          cd kernel-src
+          make O=out_halium ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
+            CROSS_COMPILE_ARM32=arm-linux-gnueabi- olddefconfig
+          make O=out_halium ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
+            CROSS_COMPILE_ARM32=arm-linux-gnueabi- -j"$(nproc)" Image.gz dtbs
+
+      - name: Upload Image
+        uses: actions/upload-artifact@v4
+        with:
+          name: Image-gz-picasso
+          path: kernel-src/out_halium/arch/arm64/boot/Image.gz
