@@ -5,13 +5,14 @@ on:
     paths:
       - 'kernel/**'
       - 'scripts/**'
+      - 'device/picasso/blobs/**'
       - '.github/workflows/**'
   workflow_dispatch:
 
 jobs:
-  kernel:
+  bootimg:
     runs-on: ubuntu-22.04
-    timeout-minutes: 120
+    timeout-minutes: 150
     steps:
       - uses: actions/checkout@v4
 
@@ -21,17 +22,10 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             git make bc bison flex libssl-dev libelf-dev \
             gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi \
-            python2 python-is-python2 cpio kmod device-tree-compiler
-          # mkbootimg (AOSP)
-          pip3 install mkbootimg 2>/dev/null || sudo apt-get install -y android-sdk-libsparse-utils || true
-
-      - name: Proton clang 13
-        run: |
-          mkdir -p ~/toolchain && cd ~/toolchain
-          # Pin a known-good Proton-clang 13 build (tested locally 2026-10-11)
-          curl -sL --retry 3 -o clang.tar.gz \
-            https://github.com/kdrag0n/proton-clang/archive/refs/heads/master.tar.gz || true
-          ls -la
+            python2 cpio kmod device-tree-compiler python3-pip
+          sudo update-alternatives --install /usr/bin/python python /usr/bin/python2 10 || true
+          python --version
+          pip3 install mkbootimg || sudo apt-get install -y android-sdk-libsparse-utils
 
       - name: Kernel source (shallow)
         run: |
@@ -43,23 +37,34 @@ jobs:
             patch -p1 --dry-run < "$p" >/dev/null 2>&1 && patch -p1 < "$p" || echo "skip $p"
           done
 
-      - name: Configure
-        run: |
-          mkdir -p kernel-src/out_halium
-          cp kernel/picasso_defconfig kernel-src/out_halium/.config
-          # NOTE: full local toolchain expected; CI uses system cross-gcc
-          # if Proton clang is unavailable (see build_kernel.sh).
-
-      - name: Build
+      - name: Build kernel (system gcc; Proton clang optional, see kernel/README.md)
         run: |
           cd kernel-src
+          mkdir -p out_halium
+          cp ../kernel/picasso_defconfig out_halium/.config
           make O=out_halium ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
-            CROSS_COMPILE_ARM32=arm-linux-gnueabi- olddefconfig
+            CROSS_COMPILE_ARM32=arm-linux-gnueabi- PYTHON=python2 olddefconfig
           make O=out_halium ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
-            CROSS_COMPILE_ARM32=arm-linux-gnueabi- -j"$(nproc)" Image.gz dtbs
+            CROSS_COMPILE_ARM32=arm-linux-gnueabi- PYTHON=python2 -j"$(nproc)" Image.gz dtbs
+          cat out_halium/include/config/kernel.release
 
-      - name: Upload Image
+      - name: Pack boot.img (proven picasso layout)
+        run: |
+          CMDLINE="earlycon=msm_geni_serial,0x4a90000 androidboot.hardware=qcom androidboot.memcg=1 lpm_levels.sleep_disabled=1 video=vfb:640x400,bpp=32,memsize=3072000 msm_rtb.filter=0x237 service_locator.enable=1 swiotlb=2048 androidboot.usbcontroller=a600000.dwc3 loop.max_part=7 androidboot.usbconfigfs=true androidboot.selinux=permissive"
+          mkbootimg \
+            --kernel kernel-src/out_halium/arch/arm64/boot/Image.gz \
+            --ramdisk device/picasso/blobs/ramdisk.cpio.gz \
+            --dtb device/picasso/blobs/rec-picasso.dtb \
+            --base 0x0 --pagesize 4096 \
+            --kernel_offset 0x8000 --ramdisk_offset 0x1200000 \
+            --tags_offset 0x100 --dtb_offset 0x1728000 \
+            --header_version 2 --cmdline "$CMDLINE" \
+            -o halium-boot-picasso.img
+          md5sum halium-boot-picasso.img
+          ls -la halium-boot-picasso.img
+
+      - name: Upload boot.img
         uses: actions/upload-artifact@v4
         with:
-          name: Image-gz-picasso
-          path: kernel-src/out_halium/arch/arm64/boot/Image.gz
+          name: halium-boot-picasso
+          path: halium-boot-picasso.img

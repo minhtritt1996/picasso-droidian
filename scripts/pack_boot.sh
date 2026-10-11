@@ -7,16 +7,22 @@
 set -e
 ROOT="${1:-$HOME/droidian}"
 OUT="$ROOT/output"
-test -f "$OUT/unpack_good2/ramdisk.cpio.gz" || { echo "missing ramdisk (see docs/02-boot-image-layout.md)"; exit 1; }
-test -f "$OUT/rec-picasso.dtb" || { echo "missing rec-picasso.dtb"; exit 1; }
+# Ramdisk+DTB: prefer repo blobs (device/picasso/blobs, CI-friendly),
+# fall back to legacy local paths on the build machine.
+RD="$ROOT/repo/device/picasso/blobs/ramdisk.cpio.gz"
+DTB="$ROOT/repo/device/picasso/blobs/rec-picasso.dtb"
+[ -f "$RD" ] || RD="$OUT/unpack_good2/ramdisk.cpio.gz"
+[ -f "$DTB" ] || DTB="$OUT/rec-picasso.dtb"
+test -f "$RD" || { echo "missing ramdisk (see docs/02-boot-image-layout.md)"; exit 1; }
+test -f "$DTB" || { echo "missing rec-picasso.dtb"; exit 1; }
 
 CMDLINE="earlycon=msm_geni_serial,0x4a90000 androidboot.hardware=qcom androidboot.memcg=1 lpm_levels.sleep_disabled=1 video=vfb:640x400,bpp=32,memsize=3072000 msm_rtb.filter=0x237 service_locator.enable=1 swiotlb=2048 androidboot.usbcontroller=a600000.dwc3 loop.max_part=7 androidboot.usbconfigfs=true androidboot.selinux=permissive"
 # NOTE: no console= param (kernel registers ttyHS0, ttyMSM0 never binds).
 
 mkbootimg \
   --kernel "$ROOT/kernel/out_halium/arch/arm64/boot/Image.gz" \
-  --ramdisk "$OUT/unpack_good2/ramdisk.cpio.gz" \
-  --dtb "$OUT/rec-picasso.dtb" \
+  --ramdisk "$RD" \
+  --dtb "$DTB" \
   --base 0x0 --pagesize 4096 \
   --kernel_offset 0x8000 --ramdisk_offset 0x1200000 \
   --tags_offset 0x100 --dtb_offset 0x1728000 \
