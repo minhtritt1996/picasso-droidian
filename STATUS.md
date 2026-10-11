@@ -57,3 +57,23 @@
 - WiFi: no wlan netdev (driver/fw missing, todo).
 - Current phone state: lxc@android MASKED (stable base, no UI), phosh disabled,
   hwcomposer wrapper untouched. DO NOT enable phosh/autostart until GPU sorted.
+
+## Update 3 - peripherals (modem/sensors/audio/wifi/display/stability)
+- MODEM: WORKS (qcrild + ofono + ModemManager active, IMEI readable; state
+  sim-missing = probably no SIM inserted - confirm with owner).
+- SENSORS: HALs (citsensor/sensorscal/vendor.sensors/sensors.qti) + sensorfwd
+  all running. Data flow untested (no UI yet).
+- AUDIO: pulse fails - /etc/pulse/droid/ was missing, copied vendor
+  audio_policy_configuration.xml + volumes (untested, reset hit during retry).
+  No ALSA cards (expected on hybris). ADSP fw present in vendor firmware_mnt.
+- WIFI: no wlan netdev (driver/fw missing - todo: ath11k/WCN + fw).
+- DISPLAY: still black. pixman+DRM allocator impossible per wlroots caps;
+  HWC swap fails; ANY EGL/GBM attempt wedges kgsl -> SoC watchdog reset.
+  a620_zap fw copied then removed for tests (in /root/fw-bak on rootfs).
+- STABILITY: 100s silent resets traced to container startup path (systemd
+  notify/apex-timeout kill). lxc@android MASKED = stable base. Manual
+  lxc-start = stable + apexd becomes ready. Suspect kill-during-TZ-call.
+  Also: first touch of GPU/audio DSP drivers can wedge SoC (handle with care,
+  verify each step, avoid rapid-fire hardware probing).
+- Phone-side hacks now include: /etc/pulse/droid/*.xml (vendor copies),
+  71-gfx rule still TODO (only chmod done), phosh drop-ins in flux.
