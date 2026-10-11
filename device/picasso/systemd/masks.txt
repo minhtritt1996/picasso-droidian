@@ -1,0 +1,12 @@
+# Masked units on picasso rootfs (all TESTED reasons, do not re-enable blindly)
+#
+# lxc@android           MASKED. systemd notify/apex-timeout kill path caused
+#                       silent 100s SoC resets. Container started manually
+#                       (lxc-start) or by picasso-wifi.service instead.
+# phosh                 MASKED. Any EGL/GBM attempt wedges kgsl -> watchdog
+#                       reset. Pulled in via android-service@hwcomposer
+#                       BindsTo, so mask (not just disable).
+# pulseaudio.service    MASKED (droidian user) + pulseaudio.socket.
+#                       Crashed D-state wedged shutdown (reboot hangs);
+#                       also resets phone when droid-HAL touches DSP
+#                       (audio bring-up in progress, see docs/09-audio-bt.md).

@@ -1,0 +1,10 @@
+[Unit]
+Description=Picasso WiFi bringup (container + vendor driver)
+After=android-mount.service network.target
+Wants=android-mount.service
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/picasso-wifi.sh
+RemainAfterExit=yes
+[Install]
+WantedBy=multi-user.target

@@ -10,3 +10,12 @@ halium-boot/
 *.zip
 *.dtb
 out/
+*.log
+cntstub/
+logkstub/
+vmtest/
+*.ko
+*.cmd
+.tmp_versions/
+Module.symvers
+modules.order

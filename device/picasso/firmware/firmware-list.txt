@@ -1,0 +1,12 @@
+# Firmware that must exist in /lib/firmware (host rootfs)
+# Copy sources from /android/vendor/firmware_mnt/image/ (TESTED 2026-10-11).
+# Keep a620_zap OUT unless testing GPU (it wedges kgsl on EGL attempts).
+
+adsp.*            # ADSP PIL (audio DSP) — 34 files, needed for audio bring-up
+bdwlan.*          # WLAN board data — 38 files, needed for wifi
+bdf_g7a.bin       # WLAN board data file (picasso panel)
+bdf_g7ac.bin
+wlanmdsp.mbn      # WCNSS DSP firmware (loads via QMI PDR, needs container)
+
+# Bluetooth (present in vendor, NOT YET WORKING - ROM never enumerates):
+#   crbtfw32.tlv crnv32.bin crnv32u.bin  (in /android/vendor/bt_firmware/image/)
