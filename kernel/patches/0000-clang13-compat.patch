@@ -1,0 +1,203 @@
+From b22e2e4d4e03c0f5d7eb585aa8cac04607dff983 Mon Sep 17 00:00:00 2001
+From: minhtritt1996 <minhtritt1996@gmail.com>
+Date: Sat, 10 Oct 2026 23:45:53 +0700
+Subject: [PATCH] fix(halium): compatibility fixes for Clang 13 and non-FOD
+ picasso build
+
+---
+ Makefile                                          | 10 +++++-----
+ .../touchscreen/focaltech_touch/focaltech_core.c  | 14 ++++++++++++++
+ include/linux/init.h                              |  2 +-
+ include/linux/string.h                            |  3 +++
+ lib/string.c                                      | 15 +++++++++++++++
+ 5 files changed, 38 insertions(+), 6 deletions(-)
+
+diff --git a/Makefile b/Makefile
+index 84de44635..83e1e278d 100644
+--- a/Makefile
++++ b/Makefile
+@@ -389,9 +389,8 @@ PYTHON2		= python2
+ PYTHON3		= python3
+ CHECK		= sparse
+ 
+-# Use the wrapper for the compiler.  This wrapper scans for new
+-# warnings and causes the build to stop upon encountering them
+-CC		= $(PYTHON) $(srctree)/scripts/gcc-wrapper.py $(REAL_CC)
++# Disable warning wrapper to allow modern Clang/LLVM compilation
++CC		= $(REAL_CC)
+ 
+ CHECKFLAGS     := -D__linux__ -Dlinux -D__STDC__ -Dunix -D__unix__ \
+ 		  -Wbitwise -Wno-return-void -Wno-unknown-attribute $(CF)
+@@ -493,21 +492,22 @@ ifeq ($(shell $(srctree)/scripts/clang-android.sh $(CC) $(CLANG_FLAGS)), y)
+ $(error "Clang with Android --target detected. Did you specify CLANG_TRIPLE?")
+ endif
+ GCC_TOOLCHAIN_DIR := $(dir $(shell which $(CROSS_COMPILE)elfedit))
+-CLANG_FLAGS	+= --prefix=$(GCC_TOOLCHAIN_DIR)
++CLANG_FLAGS	+= --prefix=$(GCC_TOOLCHAIN_DIR)$(CROSS_COMPILE)
+ GCC_TOOLCHAIN	:= $(realpath $(GCC_TOOLCHAIN_DIR)/..)
+ endif
+ ifneq ($(GCC_TOOLCHAIN),)
+ CLANG_FLAGS	+= --gcc-toolchain=$(GCC_TOOLCHAIN)
+-endif
+ CLANG_FLAGS	+= -no-integrated-as
+ CLANG_FLAGS	+= $(call cc-option, -Wno-misleading-indentation)
+ CLANG_FLAGS	+= $(call cc-option, -Wno-bool-operation)
+ CLANG_FLAGS	+= -Werror=unknown-warning-option
+ CLANG_FLAGS	+= $(call cc-option, -Wno-unsequenced)
++CLANG_FLAGS	+= $(call cc-option, -fno-builtin-stpcpy)
+ KBUILD_CFLAGS	+= $(CLANG_FLAGS)
+ KBUILD_AFLAGS	+= $(CLANG_FLAGS)
+ export CLANG_FLAGS
+ endif
++endif
+ 
+ RETPOLINE_CFLAGS_GCC := -mindirect-branch=thunk-extern -mindirect-branch-register
+ RETPOLINE_VDSO_CFLAGS_GCC := -mindirect-branch=thunk-inline -mindirect-branch-register
+diff --git a/drivers/input/touchscreen/focaltech_touch/focaltech_core.c b/drivers/input/touchscreen/focaltech_touch/focaltech_core.c
+index 5637bbf0e..2a09903f2 100644
+--- a/drivers/input/touchscreen/focaltech_touch/focaltech_core.c
++++ b/drivers/input/touchscreen/focaltech_touch/focaltech_core.c
+@@ -636,12 +636,14 @@ static int fts_input_report_b(struct fts_ts_data *data)
+ 			if (events[i].area <= 0) {
+ 				events[i].area = 0x09;
+ 			}
++#ifdef CONFIG_TOUCHSCREEN_FTS_FOD
+ 			if (!data->fod_finger_skip && fod_overlap_aera == 100) {
+ 				input_report_key(data->input_dev, BTN_INFO, 1);
+ 				data->fod_down_time++;
+ 				if (data->fod_down_time == 1)
+ 					FTS_INFO("Report_0x152 resume DOWN x:%d y:%d report_area %d success\n", events[i].x, events[i].y, fod_overlap_aera);
+ 			}
++#endif
+ 
+ 			input_report_abs(data->input_dev, ABS_MT_POSITION_X, events[i].x);
+ 			input_report_abs(data->input_dev, ABS_MT_POSITION_Y, events[i].y);
+@@ -652,6 +654,7 @@ static int fts_input_report_b(struct fts_ts_data *data)
+ 				FTS_INFO("[B]P%d TOUCH_DOWN!", events[i].id);
+ 			touchs |= BIT(events[i].id);
+ 			data->touchs |= BIT(events[i].id);
++#ifdef CONFIG_TOUCHSCREEN_FTS_FOD
+ 			if (data->point_id_changed && data->old_point_id != 0xff
+ 				&& data->fod_status == 0 && data->old_point_id != events[i].id) {
+ 				FTS_INFO("%s FOD finger ID is Changed, release old id\n", __func__);
+@@ -661,6 +664,7 @@ static int fts_input_report_b(struct fts_ts_data *data)
+ 				data->old_point_id = 0xff;
+ 				data->point_id_changed = false;
+ 			}
++#endif
+ 		} else {
+ 			uppoint++;
+ 			input_mt_report_slot_state(data->input_dev,
+@@ -1435,10 +1439,12 @@ static int fts_set_cur_value(int mode, int value)
+ 
+ 	FTS_INFO("%s, mode:%d, value:%d\n", __func__, mode, value);
+ 
++#ifdef CONFIG_TOUCHSCREEN_FTS_FOD
+ 	if (mode == Touch_Fod_Enable && fts_data && value >= 0) {
+ 		fts_data->fod_status = value;
+ 		return 0;
+ 	}
++#endif
+ 	if (mode == Touch_Aod_Enable && fts_data && value >= 0) {
+ 		fts_data->aod_status = value;
+ 		return 0;
+@@ -1924,6 +1930,7 @@ static int fb_notifier_callback(struct notifier_block *self, unsigned long event
+ 			queue_work(fts_data->event_wq, &fts_data->resume_work);
+ 		} else if (*blank == MI_DRM_BLANK_POWERDOWN || *blank == MI_DRM_BLANK_LP1 || *blank == MI_DRM_BLANK_LP2) {
+ 			FTS_INFO("FTS do suspend work by event %s\n", *blank == MI_DRM_BLANK_POWERDOWN ? "POWER DOWN" : "LP");
++#ifdef CONFIG_TOUCHSCREEN_FTS_FOD
+ 			if (*blank == MI_DRM_BLANK_POWERDOWN && fts_data->finger_in_fod) {
+ 				FTS_INFO("fb_notifier_callback:fod_status = %d\n", fts_data->fod_status);
+ 				if(fts_data->fod_status != -1 && fts_data->fod_status != 100){
+@@ -1931,6 +1938,7 @@ static int fb_notifier_callback(struct notifier_block *self, unsigned long event
+ 					fts_data->fod_finger_skip = true;
+ 				}
+ 			}
++#endif
+ 			queue_work(fts_data->event_wq, &fts_data->suspend_work);
+ 		}
+ 	}
+@@ -2120,8 +2128,10 @@ static int fts_ts_probe(struct i2c_client *client, const struct i2c_device_id *i
+ 	ts_data->client = client;
+ 	ts_data->pdata = pdata;
+ 	ts_data->old_point_id = 0xff;
++#ifdef CONFIG_TOUCHSCREEN_FTS_FOD
+ 	ts_data->point_id_changed = false;
+ 	ts_data->fod_down_time = 0;
++#endif
+ 	i2c_set_clientdata(client, ts_data);
+ 
+ 	ts_data->ts_workqueue = create_singlethread_workqueue("fts_wq");
+@@ -2522,12 +2532,16 @@ static int fts_ts_suspend(struct device *dev)
+ #ifndef CONFIG_FACTORY_BUILD
+ #if FTS_GESTURE_EN
+ 	if (fts_gesture_suspend(ts_data->client) == 0) {
++#ifdef CONFIG_TOUCHSCREEN_FTS_FOD
+ 		if(ts_data->fod_status == -1 || ts_data->fod_status == 100){
+ 			fts_fod_reg_write(ts_data->client, FTS_REG_GESTURE_FOD_ON, false);
+ 		}
++#endif
+ 		ts_data->suspended = true;
+ 		ts_data->old_point_id = 0xff;
++#ifdef CONFIG_TOUCHSCREEN_FTS_FOD
+ 		ts_data->point_id_changed = false;
++#endif
+ 		FTS_INFO("%s Tp enter suspend, set old_point_id as default value\n", __func__);
+ 		fts_irq_enable();
+ 		goto release_finger;
+diff --git a/include/linux/init.h b/include/linux/init.h
+index bc719c7da..d803ad0bf 100644
+--- a/include/linux/init.h
++++ b/include/linux/init.h
+@@ -322,7 +322,7 @@ void __init parse_early_options(char *cmdline);
+ /* Data marked not to be saved by software suspend */
+ #define __nosavedata __section(.data..nosave)
+ 
+-#define __rticdata  __attribute__((section(".bss.rtic")))
++#define __rticdata
+ 
+ #ifdef MODULE
+ #define __exit_p(x) x
+diff --git a/include/linux/string.h b/include/linux/string.h
+index 3c32b2f66..5973689c8 100644
+--- a/include/linux/string.h
++++ b/include/linux/string.h
+@@ -22,6 +22,9 @@ extern void *memdup_user_nul(const void __user *, size_t);
+ #ifndef __HAVE_ARCH_STRCPY
+ extern char * strcpy(char *,const char *);
+ #endif
++#ifndef __HAVE_ARCH_STPCPY
++extern char * stpcpy(char *,const char *);
++#endif
+ #ifndef __HAVE_ARCH_STRNCPY
+ extern char * strncpy(char *,const char *, __kernel_size_t);
+ #endif
+diff --git a/lib/string.c b/lib/string.c
+index 72125fd5b..f59b8fb41 100644
+--- a/lib/string.c
++++ b/lib/string.c
+@@ -125,6 +125,21 @@ char *strncpy(char *dest, const char *src, size_t count)
+ EXPORT_SYMBOL(strncpy);
+ #endif
+ 
++#ifndef __HAVE_ARCH_STPCPY
++/**
++ * stpcpy - Copy a %NUL terminated string, returning pointer to %NUL at the end
++ * @dest: Where to copy the string to
++ * @src: Where to copy the string from
++ */
++char *stpcpy(char *dest, const char *src)
++{
++	while ((*dest++ = *src++) != '\0')
++		/* nothing */;
++	return --dest;
++}
++EXPORT_SYMBOL(stpcpy);
++#endif
++
+ #ifndef __HAVE_ARCH_STRLCPY
+ /**
+  * strlcpy - Copy a C-string into a sized buffer
+-- 
+2.34.1
+
