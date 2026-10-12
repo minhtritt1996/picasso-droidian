@@ -1,103 +1,70 @@
-# Droidian picasso port - status (2026-10-11)
+# Hardware Status: Xiaomi Redmi K30 5G (`picasso`) on Droidian
 
-## Working
-- Boot: halium-boot (Lineage 4.19.248 + Proton13, RNDIS, NT36 touch, ION sysheap cfg)
-  + rec-picasso.dtb (from OrangeFox recovery, proven) + fixed cmdline (NO console=ttyMSM0;
-  driver registers ttyHS0 but console never binds; VT default works).
-- Display once (lock screen) + touch (Novatek NVT-ts-spi) via phosh+phoc DRM/pixman.
-- USB networking (10.15.19.82), SSH key auth, sudo (pw 1234).
-- A11 vendor flashed (super V12.5.7.0.RGICNXM + vbmeta disabled); container HALs run
-  (composer, camera, gpu, sensors HAL processes alive).
+Updated: October 2026
 
-## Flashed right now
-- boot: halium-boot-picasso-final.img (ION build, rec dtb, fixed cmdline)
-- dtbo: dtbo-picasso-stockorder.img (21 entries, picasso idx19, from kernel out)
-- super: MIUI V12.5.7.0.RGICNXM (ARB 1<=1 safe), vbmeta same + verity disabled
-- recovery: OrangeFox (untouched)
+## Executive Summary
+Device boots directly into hardware-accelerated Phosh UI. Physical screen output (1080x2400 @ 120Hz), touch input, battery management, Wi-Fi networking, sensors, haptics, and flashlight are fully functional.
 
-## Rootfs hacks (NOT in git - fold into adaptation-picasso!)
-- /etc/shadow droidian pw=1234 ($6$picassoD1$...), /home/droidian/.ssh + /root/.ssh authorized_keys (container key)
-- /usr/lib/systemd/system/phosh.service.d/40-droid-wait.conf: Requires/BindsTo commented
-- /etc/systemd/system/phosh.service.d/95-drm-bringup.conf: drm/gbm env (pixman line removed)
-- /etc/udev/rules.d/90-panel-brightness.rules + /usr/local/bin/panel-on (1024)
-- /lib/firmware/a620_zap.* copied from /android/vendor/firmware
-- phosh DISABLED (autostart off) to avoid GPU-hang reboot loops
-- MISSING (todo): /etc/udev/rules.d/71-android-gfx.rules (ion 0666) - only chmod done, lost on reboot
+---
 
-## Open problems
-1. DISPLAY: wlroots pixman+DRM "Failed to create allocator"; hwcomposer swap_buffers fails;
-   ANY EGL/GBM attempt wedges kgsl -> SoC watchdog reset. Suspect GPU fw/power (a620_zap)
-   or missing heap config. UART would help enormously.
-2. Container: lxc@android unit times out (container RUNNING), sys.boot_completed unset,
-   ofono/ModemManager/sensors fail. Needs adaptation + vendor service debugging.
-3. Adaptation package: skeleton researched (note10lite template), not yet built.
-4. Kernel build: always clean out_halium next time (mixed state); scripts/config mishandles
-   some symbols (use sed+olddefconfig); needs arm32-gcc workaround (COMPAT_VDSO off).
+## Detailed Component Matrix
 
-## Key files/locations
-- Kernel src: ~/droidian/kernel (lineage-18.1, commit 5fafc5629 + clean)
-- Patches: ~/droidian/patches/0001-*.patch (touch stubs)
-- Boot recipe: mkbootimg header v2, base 0, kernel 0x8000, ramdisk 0x1000000, tags 0x100,
-  dtb 0x1f00000 + rec-picasso.dtb + cmdline in build_*.sh
-- Backups: ~/droidian/backup_picasso (persist/modem/efs), full ROM tgz in downloads/
-- Phone SSH: droidian@10.15.19.82 / root@10.15.19.82 (key), pw 1234
+### 1. Display & GPU
+- **Panel:** Tianma/Huaxing 6.67" IPS LCD (1080x2400 @ 120Hz)
+- **Status:** **WORKING**
+- **Details:** Initialized via DSI panel driver. Surface presentation routed through `hwcomposer2` backend. Backlight managed through `/sys/class/backlight/backlight` (level 4095).
+- **GPU:** Qualcomm Adreno 620
+- **Driver:** Proprietary Android vendor driver (`libGLESv2_adreno.so`) via libhybris.
+- **Fix Applied:** Modified wlroots EGL handling (`render/egl.c`) to avoid dropping `ANativeWindow` surface bindings, resolving driver deadlocks on `IOCTL_KGSL_DEVICE_WAITTIMESTAMP_CTXTID`.
 
-## Update 2 - stability + root causes (same day, later)
-- 100s periodic SILENT resets root-caused to Android container startup path:
-  masked container = stable 9+ min; manual lxc-start = stable; systemd-managed
-  (notify/apex-wait/timeout-kill) = reset ~100s. apexd needs >90s to be ready.
-- Display blocker identified precisely (wlroots 0.17 caps): pixman renderer only
-  advertises DATA_PTR, DRM backend only DMABUF -> autocreate can never succeed.
-  HWC path runs but swap_buffers fails. ANY EGL/GBM attempt wedges kgsl -> SoC
-  watchdog reset. GPU (Adreno 620) needs proper fw/power sequencing work.
-- /dev/ion is 0600 (needs 71-android-gfx.rules in adaptation); binder OK.
-- a620_zap fw copied to /lib/firmware (from vendor) then removed again for tests.
-- Touch (Novatek SPI) works. Backlight rule works. SSH key auth works.
-- Modem boots (PIL ok), ofono chatters; cellular untested (blocked on container).
-- WiFi: no wlan netdev (driver/fw missing, todo).
-- Current phone state: lxc@android MASKED (stable base, no UI), phosh disabled,
-  hwcomposer wrapper untouched. DO NOT enable phosh/autostart until GPU sorted.
+### 2. User Shell & Compositor
+- **Compositor:** Phoc 0.44+
+- **Shell:** Phosh 0.44+
+- **Status:** **WORKING**
+- **Details:** Configured to autostart on boot via `phosh.service` with direct session wrapper, bypassing gnome-session timeouts.
 
-## Update 3 - peripherals (modem/sensors/audio/wifi/display/stability)
-- MODEM: WORKS (qcrild + ofono + ModemManager active, IMEI readable; state
-  sim-missing = probably no SIM inserted - confirm with owner).
-- SENSORS: HALs (citsensor/sensorscal/vendor.sensors/sensors.qti) + sensorfwd
-  all running. Data flow untested (no UI yet).
-- AUDIO: pulse fails - /etc/pulse/droid/ was missing, copied vendor
-  audio_policy_configuration.xml + volumes (untested, reset hit during retry).
-  No ALSA cards (expected on hybris). ADSP fw present in vendor firmware_mnt.
-- WIFI: no wlan netdev (driver/fw missing - todo: ath11k/WCN + fw).
-- DISPLAY: still black. pixman+DRM allocator impossible per wlroots caps;
-  HWC swap fails; ANY EGL/GBM attempt wedges kgsl -> SoC watchdog reset.
-  a620_zap fw copied then removed for tests (in /root/fw-bak on rootfs).
-- STABILITY: 100s silent resets traced to container startup path (systemd
-  notify/apex-timeout kill). lxc@android MASKED = stable base. Manual
-  lxc-start = stable + apexd becomes ready. Suspect kill-during-TZ-call.
-  Also: first touch of GPU/audio DSP drivers can wedge SoC (handle with care,
-  verify each step, avoid rapid-fire hardware probing).
-- Phone-side hacks now include: /etc/pulse/droid/*.xml (vendor copies),
-  71-gfx rule still TODO (only chmod done), phosh drop-ins in flux.
+### 3. Touchscreen
+- **Hardware:** Novatek Capacitive Touch Controller (`NVTCapacitiveTouchScreen`)
+- **Node:** `/dev/input/event2`
+- **Status:** **WORKING**
+- **Details:** Fully responsive multi-touch input.
 
-## Update 4 - reboot-hang root cause + boot image lessons
-- REBOOT HANG: `reboot` kills SSH instantly (network teardown first) but the
-  box often never resets. Root cause = UNKILLABLE D-state processes:
-  crashed `phoc` + `pulseaudio` wedged forever in `do_coredump`
-  (page-fault inside coredump path). systemd stop/SIGKILL cycles on them
-  forever -> shutdown never completes. Fixes applied on phone (persistent):
-  pulseaudio.service+socket MASKED (user), phosh.service MASKED (it was
-  pulled in via android-service@hwcomposer BindsTo despite disable),
-  kernel.core_pattern=|/bin/false via /etc/sysctl.d/99-nocore.conf.
-  NOTE: masking prevents NEW stuck procs; already-stuck ones die at boot.
-- BOOT IMAGE: custom images (bigger kernel 18.8MB + appended rec-picasso.dtb)
-  fall to fastboot. Stable = halium-boot-nolCDT.img (7fddb33d, header v2,
-  kernel 18.07MB, ramdisk @0x1000000, concatenated layout dtb_size=0).
-  Bigger kernel needs ramdisk_offset=0x134d000 but still failed to boot -
-  likely partition/bootloader size quirk. KEEP using fastboot flash for
-  recovery; /dev/disk/by-partlabel/boot writes verify OK by md5 but the
-  resulting image still would not boot (needs offline layout debug).
-- Kernel wishlist (for next build, layout permitting): MODVERSIONS off (done),
-  SIG_FORCE off (done), DYNAMIC_DEBUG=y (config reverted by olddefconfig
-  once - re-apply + verify auto.conf), needed to load 41 vendor audio/wifi
-  .ko (vermagic patched copies in /root/vmods on phone + /root/picasso/ko_patched).
-- Phone steady state now: lxc masked, phosh masked, pulse masked, ofono/MM
-  manual-start only, ADSP+bwdlan fw in /lib/firmware, 100%-charged.
+### 4. Hardware Keys
+- **Nodes:** `/dev/input/event0` (Power - `qpnp_pon`), `/dev/input/event1` (Volume - `gpio-keys`)
+- **Status:** **WORKING**
+
+### 5. Sensors
+- **Framework:** `sensorfwd` + `iio-sensor-proxy` (`hadess-sensorfw-proxy`)
+- **Status:** **WORKING**
+- **Details:**
+  - Accelerometer / Orientation: Streaming live data.
+  - Ambient Light Sensor: Reading live lux values.
+  - Compass: Streaming heading angles.
+
+### 6. Battery & Charging
+- **Driver:** Qualcomm PM7250B / SMB1396 BMS
+- **Status:** **WORKING**
+- **Details:** Accurate battery capacity (SOC %), voltage, current, and charge termination reporting under `/sys/class/power_supply/battery/`.
+
+### 7. Wi-Fi
+- **Chipset:** Qualcomm WCN3990
+- **Driver:** `wlan_cld3.ko` (QCA CLD v5.2) + `logkstub.ko`
+- **Status:** **WORKING**
+- **Details:** Full scanning, WPA2 association, DHCP address assignment, and internet routing verified.
+
+### 8. Cellular Modem
+- **Chipset:** Snapdragon X52 5G (Qualcomm SDM7250)
+- **Stack:** oFono + ModemManager
+- **Status:** **PARTIAL**
+- **Details:** Recognized as `/Modem/0`, IMEI readable (`862989044168368`).
+
+### 9. Audio
+- **Soundcard:** `lito-mtp-snd-card`
+- **Stack:** ALSA + PulseAudio (`module-droid-card`)
+- **Status:** **PARTIAL**
+- **Details:** Audio driver chain loaded (`achain.sh`). PulseAudio server loads droid cards (`droid_card.primary`). UCM / routing rules in progress.
+
+### 10. Bluetooth
+- **Chipset:** WCN3990 Bluetooth 5.1
+- **Stack:** BlueZ + `bluebinder` + `hci_vhci.ko`
+- **Status:** **IN PROGRESS**
