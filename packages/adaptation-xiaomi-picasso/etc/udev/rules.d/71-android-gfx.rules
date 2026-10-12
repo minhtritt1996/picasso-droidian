@@ -1,0 +1,3 @@
+KERNEL=="ion", MODE="0666"
+KERNEL=="kgsl-3d0", MODE="0666"
+SUBSYSTEM=="kgsl", MODE="0666", ATTR{preemption}="0"

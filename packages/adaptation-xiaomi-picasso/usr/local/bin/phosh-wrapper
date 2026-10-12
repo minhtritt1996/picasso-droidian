@@ -1,0 +1,3 @@
+#!/bin/sh
+# Bỏ qua tất cả args (kể cả --session=phosh do phosh-session truyền vào)
+exec /usr/libexec/phosh

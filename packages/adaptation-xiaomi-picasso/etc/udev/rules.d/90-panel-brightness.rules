@@ -1,0 +1,1 @@
+ACTION=="add", SUBSYSTEM=="backlight", RUN+="/usr/local/bin/panel-on"
