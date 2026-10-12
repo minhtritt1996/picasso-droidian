@@ -24,3 +24,16 @@
   (hci_uart path impossible without rebuild + wiring proof).
 - Firmware present but unused: crbtfw32.tlv crnv32.bin crnv32u.bin.
 - Next: find what boots the BT ROM (clock/reset/FW push order from stock).
+
+## Update 2026-10-12: pulse-hidl isolated as reset trigger
+- Complete unbuffered strace (4206 lines, both threads) proves pulse itself
+  only retries /dev/snd/controlC* (ENOENT) + nanosleep. No DSP syscalls.
+- `module-droid-hidl` (HwBinder, blocks forever waiting for miniafservice
+  which does NOT exist in container) -> silent SoC reset ~40-60s later.
+  WITHOUT hidl: pulse stable 320s+. Generic pulse (no droid) also stable.
+- Mechanism unknown (idle blocked thread cannot reset HW; suspect delayed
+  transaction or HAL .so constructor side effect via audio.primary.lito.so
+  which IS dlopened at init). Needs TZ-level debugging (no UART).
+- WORKAROUND for now: keep hidl disabled; droid-card alone is stable
+  (but no sound without ADSP/ALSA cards).
+- ADSP never boots (OFFLINING always). Next: safe PIL trigger experiments.
