@@ -1,0 +1,271 @@
+diff --git a/backend/hwcomposer/hwcomposer2.c b/backend/hwcomposer/hwcomposer2.c
+index 2d6214b..93b5083 100644
+--- a/backend/hwcomposer/hwcomposer2.c
++++ b/backend/hwcomposer/hwcomposer2.c
+@@ -188,11 +188,9 @@ static void hwcomposer2_present(void *user_data, struct ANativeWindow *window,
+ 		wlr_log(WLR_ERROR, "prepare: validate failed for display %ld: %d",
+ 			output->hwc_display_id, error);
+ 		return;
+-	} else if ((error == HWC2_ERROR_HAS_CHANGES && num_types) || num_requests) {
+-		wlr_log(WLR_ERROR, "prepare: validate required changes for display %ld: %d",
+-			output->hwc_display_id, error);
+-		return;
+-	} else if (error == HWC2_ERROR_HAS_CHANGES) {
++	}
++
++	if (num_types > 0 || num_requests > 0 || error == HWC2_ERROR_HAS_CHANGES) {
+ 		error = hwc2_compat_display_accept_changes(hwc_display);
+ 		if (error != HWC2_ERROR_NONE) {
+ 			wlr_log(WLR_ERROR, "prepare: acceptChanges failed: %d", error);
+@@ -208,13 +206,10 @@ static void hwcomposer2_present(void *user_data, struct ANativeWindow *window,
+ 	hwc2_compat_display_present(hwc_display, &present_fence);
+ 
+ 	if (hwc2_output->hwc2_last_present_fence != -1) {
+-		sync_wait(hwc2_output->hwc2_last_present_fence, -1);
+ 		close(hwc2_output->hwc2_last_present_fence);
+ 	}
+ 
+-	hwc2_output->hwc2_last_present_fence = present_fence != -1 ? dup(present_fence) : -1;
+-
+-	HWCNativeBufferSetFence(buffer, present_fence);
++	hwc2_output->hwc2_last_present_fence = present_fence;
+ }
+ 
+ static struct wlr_hwcomposer_output* hwcomposer2_add_output(struct wlr_hwcomposer_backend *hwc_backend, int display)
+diff --git a/backend/hwcomposer/output.c b/backend/hwcomposer/output.c
+index 241df2a..4dcfaed 100644
+--- a/backend/hwcomposer/output.c
++++ b/backend/hwcomposer/output.c
+@@ -151,7 +151,10 @@ static void output_destroy(struct wlr_output *wlr_output) {
+ 		wl_event_source_remove(output->vsync_timer);
+ 	}
+ 
+-	//wlr_egl_destroy_surface(&hwc_backend->egl, output->egl_surface);
++	if (output->egl_surface && output->egl_display) {
++		eglDestroySurface((EGLDisplay)output->egl_display, (EGLSurface)output->egl_surface);
++		output->egl_surface = NULL;
++	}
+ 
+ 	hwc_backend->impl->destroy_output(output);
+ }
+diff --git a/include/render/android.h b/include/render/android.h
+index de69a90..43fdc0a 100644
+--- a/include/render/android.h
++++ b/include/render/android.h
+@@ -14,6 +14,7 @@ struct wlr_android_renderer {
+ 
+ 	struct wlr_egl *egl;
+ 	EGLNativeWindowType window;
++	struct wlr_output *last_output;
+ 
+ 	struct wl_list buffers; // wlr_gles2_buffer.link
+ 	struct wlr_drm_format_set shm_formats;
+diff --git a/render/android/renderer.c b/render/android/renderer.c
+index aecc864..d6e7bf5 100644
+--- a/render/android/renderer.c
++++ b/render/android/renderer.c
+@@ -152,10 +152,21 @@ static const struct wlr_addon_interface buffer_addon_impl = {
+ 
+ static struct wlr_android_buffer *get_or_create_buffer(struct wlr_android_renderer *renderer,
+ 		struct wlr_buffer *wlr_buffer, struct wlr_output *output) {
++	if (!output && renderer->last_output) {
++		output = renderer->last_output;
++	}
++
+ 	struct wlr_addon *addon =
+ 		wlr_addon_find(&wlr_buffer->addons, renderer, &buffer_addon_impl);
+ 	if (addon) {
+ 		struct wlr_android_buffer *buffer = wl_container_of(addon, buffer, addon);
++		if (buffer->egl_surface == EGL_NO_SURFACE && output) {
++			struct wlr_hwcomposer_output *hwc_output = (struct wlr_hwcomposer_output *)output;
++			if (hwc_output && hwc_output->egl_surface) {
++				buffer->egl_surface = hwc_output->egl_surface;
++				buffer->output = output;
++			}
++		}
+ 		return buffer;
+ 	}
+ 
+@@ -168,21 +179,22 @@ static struct wlr_android_buffer *get_or_create_buffer(struct wlr_android_render
+ 	buffer->renderer = renderer;
+ 	buffer->output = output;
+ 
+-	// This is rather bad, as we interwine not only wlr_output here, but
+-	// also the platform-specic hwcomposer backend.
+-	// This needs to be reworked. Still, this renderer is pretty much only usable
+-	// by the hwcomposer backend only anyway.
+ 	struct wlr_hwcomposer_output *hwc_output = (struct wlr_hwcomposer_output *)output;
+ 	if (!hwc_output || !hwc_output->egl_window) {
+-		wlr_log(WLR_ERROR, "No native window set");
++		wlr_log(WLR_ERROR, "No native window set (output=%p, last=%p)", output, renderer->last_output);
+ 		buffer->egl_surface = EGL_NO_SURFACE;
+ 	} else {
+-		buffer->egl_surface = eglCreateWindowSurface(renderer->egl->display,
+-			renderer->egl->config, (EGLNativeWindowType)hwc_output->egl_window, NULL);
+-		if (buffer->egl_surface == EGL_NO_SURFACE) {
+-			wlr_log(WLR_ERROR, "Failed to recreate EGL surface");
+-			return NULL;
++		if (!hwc_output->egl_surface) {
++			hwc_output->egl_surface = eglCreateWindowSurface(renderer->egl->display,
++				renderer->egl->config, (EGLNativeWindowType)hwc_output->egl_window, NULL);
++			if (hwc_output->egl_surface == EGL_NO_SURFACE) {
++				wlr_log(WLR_ERROR, "Failed to create EGL surface");
++				free(buffer);
++				return NULL;
++			}
++			hwc_output->egl_display = renderer->egl->display;
+ 		}
++		buffer->egl_surface = hwc_output->egl_surface;
+ 
+ 		wlr_addon_init(&buffer->addon, &wlr_buffer->addons, renderer,
+ 			&buffer_addon_impl);
+@@ -190,8 +202,8 @@ static struct wlr_android_buffer *get_or_create_buffer(struct wlr_android_render
+ 		wl_list_insert(&renderer->buffers, &buffer->link);
+ 	}
+ 
+-	wlr_log(WLR_DEBUG, "Created WindowSurface for buffer %dx%d",
+-			wlr_buffer->width, wlr_buffer->height);
++	wlr_log(WLR_DEBUG, "Created WindowSurface for buffer %dx%d (surface=%p)",
++			wlr_buffer->width, wlr_buffer->height, buffer->egl_surface);
+ 
+ 	return buffer;
+ }
+@@ -211,6 +223,12 @@ static bool android_bind_buffer_for_output(struct wlr_renderer *wlr_renderer,
+ 		struct wlr_buffer *wlr_buffer, struct wlr_output *output) {
+ 	struct wlr_android_renderer *renderer = android_get_renderer(wlr_renderer);
+ 
++	if (output) {
++		renderer->last_output = output;
++	} else if (renderer->last_output) {
++		output = renderer->last_output;
++	}
++
+ 	if (wlr_buffer == NULL) {
+ 		return true;
+ 	}
+@@ -225,7 +243,8 @@ static bool android_bind_buffer_for_output(struct wlr_renderer *wlr_renderer,
+ 
+ static bool android_bind_buffer(struct wlr_renderer *wlr_renderer,
+ 		struct wlr_buffer *wlr_buffer) {
+-	return android_bind_buffer_for_output(wlr_renderer, wlr_buffer, NULL);
++	struct wlr_android_renderer *renderer = android_get_renderer(wlr_renderer);
++	return android_bind_buffer_for_output(wlr_renderer, wlr_buffer, renderer->last_output);
+ }
+ 
+ static bool android_begin(struct wlr_renderer *wlr_renderer, uint32_t width,
+@@ -348,9 +367,14 @@ static bool android_swap_buffers(struct wlr_renderer *wlr_renderer, pixman_regio
+ 		struct wlr_output *output) {
+ 	struct wlr_android_renderer *renderer = android_get_renderer(wlr_renderer);
+ 
++	struct wlr_hwcomposer_output *hwc_output = (struct wlr_hwcomposer_output *)(output ? output : renderer->last_output);
++	if (hwc_output && hwc_output->egl_surface) {
++		return wlr_egl_swap_buffers(renderer->egl, hwc_output->egl_surface, damage);
++	}
++
+ 	struct wlr_android_buffer *buffer, *buffer_tmp;
+ 	wl_list_for_each_safe(buffer, buffer_tmp, &renderer->buffers, link) {
+-		if (!buffer || buffer->egl_surface == EGL_NO_SURFACE || buffer->output != output)
++		if (!buffer || buffer->egl_surface == EGL_NO_SURFACE)
+ 			continue;
+ 
+ 		return wlr_egl_swap_buffers(renderer->egl, buffer->egl_surface, buffer->is_damaged ? damage : NULL);
+diff --git a/render/egl.c b/render/egl.c
+index e2bfa55..fcca283 100644
+--- a/render/egl.c
++++ b/render/egl.c
+@@ -411,8 +411,6 @@ static bool egl_init_display(struct wlr_egl *egl, EGLDisplay display, bool is_an
+ 			EGL_GREEN_SIZE, 8,
+ 			EGL_BLUE_SIZE, 8,
+ 			EGL_ALPHA_SIZE, 8,
+-			EGL_DEPTH_SIZE, 24,
+-			EGL_STENCIL_SIZE, 8,
+ 			EGL_NONE
+ 		};
+ 		if (!egl_get_config(egl->display, config_attribs, &egl->config, HAL_PIXEL_FORMAT_RGBA_8888)) {
+@@ -488,9 +486,11 @@ static bool egl_init(struct wlr_egl *egl, EGLenum platform,
+ 	attribs[atti++] = EGL_CONTEXT_CLIENT_VERSION;
+ 	attribs[atti++] = 2;
+ 
++	bool is_android = (platform == EGL_PLATFORM_ANDROID_KHR);
++
+ 	// Request a high priority context if possible
+ 	// TODO: only do this if we're running as the DRM master
+-	bool request_high_priority = egl->exts.IMG_context_priority;
++	bool request_high_priority = !is_android && egl->exts.IMG_context_priority;
+ 
+ 	// Try to reschedule all of our rendering to be completed first. If it
+ 	// fails, it will fallback to the default priority (MEDIUM).
+@@ -499,7 +499,7 @@ static bool egl_init(struct wlr_egl *egl, EGLenum platform,
+ 		attribs[atti++] = EGL_CONTEXT_PRIORITY_HIGH_IMG;
+ 	}
+ 
+-	if (egl->exts.EXT_create_context_robustness) {
++	if (!is_android && egl->exts.EXT_create_context_robustness) {
+ 		attribs[atti++] = EGL_CONTEXT_OPENGL_RESET_NOTIFICATION_STRATEGY_EXT;
+ 		attribs[atti++] = EGL_LOSE_CONTEXT_ON_RESET_EXT;
+ 	}
+diff --git a/render/wlr_renderer.c b/render/wlr_renderer.c
+index dcfc26d..944ee74 100644
+--- a/render/wlr_renderer.c
++++ b/render/wlr_renderer.c
+@@ -112,11 +112,22 @@ bool wlr_renderer_begin_with_buffer(struct wlr_renderer *r,
+ 
+ bool wlr_renderer_begin_with_buffer_for_output(struct wlr_renderer *r,
+ 		struct wlr_buffer *buffer, struct wlr_output *output) {
+-	if (output && r->impl->bind_buffer_for_output && !renderer_bind_buffer_for_output(r, buffer, output)) {
+-		return false;
++	if (output && r->impl->bind_buffer_for_output) {
++		if (!renderer_bind_buffer_for_output(r, buffer, output)) {
++			return false;
++		}
++	} else {
++		if (!renderer_bind_buffer(r, buffer)) {
++			return false;
++		}
+ 	}
+ 
+-	return wlr_renderer_begin_with_buffer(r, buffer);
++	if (!wlr_renderer_begin(r, buffer->width, buffer->height)) {
++		renderer_bind_buffer(r, NULL);
++		return false;
++	}
++	r->rendering_with_buffer = true;
++	return true;
+ }
+ 
+ void wlr_renderer_end(struct wlr_renderer *r) {
+@@ -507,7 +518,7 @@ struct wlr_render_pass *wlr_renderer_begin_buffer_pass_for_output(struct wlr_ren
+ 		options = &default_options;
+ 	}
+ 
+-	return renderer->impl->begin_buffer_pass_for_output(renderer, buffer, options, NULL);
++	return renderer->impl->begin_buffer_pass_for_output(renderer, buffer, options, output);
+ }
+ 
+ struct wlr_render_timer *wlr_render_timer_create(struct wlr_renderer *renderer) {
+diff --git a/types/output/render.c b/types/output/render.c
+index b4e06fb..e069c93 100644
+--- a/types/output/render.c
++++ b/types/output/render.c
+@@ -103,7 +103,7 @@ static struct wlr_buffer *output_acquire_empty_buffer(struct wlr_output *output,
+ 	}
+ 
+ 	struct wlr_render_pass *pass =
+-		wlr_renderer_begin_buffer_pass(output->renderer, buffer, NULL);
++		wlr_renderer_begin_buffer_pass_for_output(output->renderer, buffer, NULL, output);
+ 	if (pass == NULL) {
+ 		wlr_buffer_unlock(buffer);
+ 		return NULL;
+@@ -277,10 +277,10 @@ struct wlr_render_pass *wlr_output_begin_render_pass(struct wlr_output *output,
+ 
+ 	struct wlr_renderer *renderer = output->renderer;
+ 	assert(renderer != NULL);
+-	struct wlr_render_pass *pass = wlr_renderer_begin_buffer_pass(renderer, buffer,
++	struct wlr_render_pass *pass = wlr_renderer_begin_buffer_pass_for_output(renderer, buffer,
+ 			&(struct wlr_buffer_pass_options){
+ 		.timer = timer,
+-	});
++	}, output);
+ 	if (pass == NULL) {
+ 		return NULL;
+ 	}

@@ -19,3 +19,30 @@ vmtest/
 .tmp_versions/
 Module.symvers
 modules.order
+
+# Build artifacts & binaries
+*.bin
+libkgsl_interceptor.so
+test_gpu_diag
+test_hwc2_step
+test_screen_present
+test_screen_render_and_present
+test_screen_texture
+kgsl_interceptor.c
+test_*.c
+
+# Scratch & temporary development folders
+scratch/
+scratch_wlroots/
+adspboot/
+popstub*/
+q6up/
+sndre/
+vhci/
+wsacreate/
+zapboot/
+vmods/
+
+# Root logs
+*.log
+output/
