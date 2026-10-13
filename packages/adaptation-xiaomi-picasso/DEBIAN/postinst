@@ -11,12 +11,32 @@ chmod +x /usr/local/bin/phosh-wrapper /usr/local/bin/panel-on 2>/dev/null || tru
 udevadm control --reload-rules || true
 udevadm trigger || true
 
+# Disable UFS runtime PM, clock gating and clock scaling immediately
+if [ -f /sys/bus/platform/devices/1d84000.ufshc/power/control ]; then
+    echo 0 > /sys/bus/platform/devices/1d84000.ufshc/clkgate_enable 2>/dev/null || true
+    echo 0 > /sys/bus/platform/devices/1d84000.ufshc/clkscale_enable 2>/dev/null || true
+    echo on > /sys/bus/platform/devices/1d84000.ufshc/power/control 2>/dev/null || true
+fi
+
+# Update dconf database for system-wide background settings
+if command -v dconf >/dev/null 2>&1; then
+    dconf update || true
+fi
+
+# Disable kernel coredump to prevent translation fault oops
+mkdir -p /etc/sysctl.d
+cat << 'EOF' > /etc/sysctl.d/99-disable-coredump.conf
+kernel.core_pattern =
+fs.suid_dumpable = 0
+EOF
+sysctl -p /etc/sysctl.d/99-disable-coredump.conf 2>/dev/null || true
+
 # Enable systemd services
 systemctl daemon-reload
 systemctl enable backlight-boot.service || true
 
-# Mask conflict services
-systemctl mask droidian-fpd.service picasso-audio.service picasso-wifi.service 2>/dev/null || true
+# Mask conflict / problematic services
+systemctl mask droidian-fpd.service picasso-audio.service picasso-wifi.service mobile-power-saver.service pulseaudio.service pulseaudio.socket 2>/dev/null || true
 
 echo "=== adaptation-xiaomi-picasso installed successfully ==="
 exit 0

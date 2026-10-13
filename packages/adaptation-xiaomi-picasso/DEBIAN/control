@@ -3,6 +3,8 @@ Version: 1.0.0
 Architecture: arm64
 Maintainer: Minh Tri <minhtritt1996@gmail.com>
 Depends: adaptation-android-generic, phosh, phoc
+Replaces: libwlroots12a, getcutout
+Provides: adaptation-device
 Section: misc
 Priority: optional
 Description: Hardware adaptation package for Xiaomi Redmi K30 5G (picasso)

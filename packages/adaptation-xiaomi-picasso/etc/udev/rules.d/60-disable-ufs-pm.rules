@@ -1,0 +1,4 @@
+# Prevent UFS host controller clock gating, clock scaling, and runtime suspend deadlock
+ACTION=="add", SUBSYSTEM=="platform", KERNEL=="1d84000.ufshc", ATTR{clkgate_enable}="0", ATTR{clkscale_enable}="0", ATTR{power/control}="on"
+ACTION=="add", SUBSYSTEM=="scsi", ATTR{power/control}="on"
+ACTION=="add", SUBSYSTEM=="block", KERNEL=="sd[a-z]*", ATTR{power/control}="on"

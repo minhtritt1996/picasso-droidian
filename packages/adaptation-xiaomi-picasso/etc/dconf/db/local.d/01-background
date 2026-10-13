@@ -1,0 +1,5 @@
+[org/gnome/desktop/background]
+picture-options='none'
+color-shading-type='solid'
+primary-color='#1c2333'
+secondary-color='#1c2333'
