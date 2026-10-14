@@ -118,3 +118,10 @@
 - Kết luận: trio trung tính; cả 2 biến thể kernel đều chết theo cách riêng.
 - Nghi mới: secure-memory/protection (writes void + fault khi access) hoặc spurious
   hang-trip. Cần audit secure heap path hoặc dump IB.
+
+## Bổ sung: so config với kernel A16 đang chạy tốt (Infinity, extract-ikconfig)
+- Kernel A16: 4.19.113 + Clang 21 (2026), cùng base version với ta.
+- GPU/ION/IOMMU code: GIỐNG HỆT (trừ trio đã revert).
+- Khác biệt duy nhất đáng kể trong memory: A16 TẮT `CONFIG_ION_SYSTEM_HEAP`,
+  ta BẬT. Giả thuyết: heap sai thứ tự ưu tiên → writes void + fault khi sample.
+- Đang test: tắt ION_SYSTEM_HEAP, rebuild full, flash thử.
