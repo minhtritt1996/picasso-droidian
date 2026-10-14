@@ -89,4 +89,10 @@
 - LLC slice on/off: không đổi. Ép clocks: không đổi. Buffer 1/2/3/8: chết y hệt.
 - Damage tắt: chết ở ts cao (4162/8321) thay vì ts 2 — nhưng không cứu được.
 - Stock DTB (boot.img V12.5.7) vs rec-picasso.dtb: phần GPU GIỐNG HỆT → loại DT.
+- Custom dtbo vs stock: chỉ khác panel/FOD cosmetics (smart-fps, dims, HBM cmds) → loại dtbo.
+- Kernel trio Oct-12 (secure-bypass/amsbc/IRQ) + kgsl_events #if0: TRUNG TÍNH với fault.
+  Phát hiện: kernel #42 đang chạy build từ source TRƯỚC trio (object cũ hơn commit) — trio
+  chưa từng được test cho tới build #44/#45/#46 tay.
+- kgsl_events #if0 gây event storm (load 45): REVERT ngay, nguy hiểm.
+- nosuicide là drop-in permanent (70-nosuicide.conf) — session sống qua fault, hết spiral reset.
 - Mesa-CPU đỏ chuẩn → kernel/memory vô tội; bệnh khoanh vào vendor-GPU path.
