@@ -1,0 +1,12 @@
+[Unit]
+Description=Xiaomi Picasso LCD Panel DDIC Wakeup
+After=android-service@hwcomposer.service
+Before=phosh.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/panel-on.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=graphical.target
