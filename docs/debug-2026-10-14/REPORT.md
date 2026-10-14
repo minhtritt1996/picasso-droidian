@@ -103,3 +103,10 @@
 - Kế hoạch: bung vendor.new.dat.br → vendor.img → lấy libEGL/GLESv2_adreno 2022,
   backup bản cũ, swap file, test egltest3 (triangle). Revert được ngay, không flash.
 - Mirror dự phòng: bkt-sgp (Alibaba SG), bn.d.miui, cdnorg, hugeota.
+
+## Bổ sung: blob Adreno thử 3 đời, kết quả như nhau
+- V12.5.7 stock (V@0502 08/20), MIUI 13 V13.0.5 (V@0502 04/21), Lineage sm7250
+  (V@0502 09/27/21): triangle test đều đen, windowed đều fault 00800005 y hệt.
+- Swap qua bind-mount host (reversible), LD_LIBRARY_PATH vô dụng với hybris linker.
+- Kết luận: blob version không phải biến số. Nghi phần cứng (silicon GPU) hoặc
+  tầng hybris/kernel chung cho mọi blob. Cần verdict bằng Lineage tạm hoặc dump IB.
