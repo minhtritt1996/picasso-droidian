@@ -96,3 +96,10 @@
 - kgsl_events #if0 gây event storm (load 45): REVERT ngay, nguy hiểm.
 - nosuicide là drop-in permanent (70-nosuicide.conf) — session sống qua fault, hết spiral reset.
 - Mesa-CPU đỏ chuẩn → kernel/memory vô tội; bệnh khoanh vào vendor-GPU path.
+
+## Bổ sung: thử blob Adreno MIUI 13 (đang tiến hành)
+- Đang tải `miui_PICASSO_V13.0.5.0.SGICNXM` (4.6GB, Android 12, 2022-11) từ bigota.d.miui.com
+  (aria2c 16 luồng; wget 1 luồng bị throttle ~17KB/s).
+- Kế hoạch: bung vendor.new.dat.br → vendor.img → lấy libEGL/GLESv2_adreno 2022,
+  backup bản cũ, swap file, test egltest3 (triangle). Revert được ngay, không flash.
+- Mirror dự phòng: bkt-sgp (Alibaba SG), bn.d.miui, cdnorg, hugeota.
