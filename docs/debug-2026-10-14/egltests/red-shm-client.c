@@ -6,8 +6,8 @@
 #include <sys/mman.h>
 #include <wayland-client.h>
 #include "xdg-shell.h"
-#define W 64
-#define H 64
+#define W 1080
+#define H 2400
 static struct wl_display *dpy;
 static struct wl_compositor *comp;
 static struct wl_shm *shm;
@@ -70,9 +70,9 @@ int main() {
   xdg_toplevel_set_fullscreen(top, 0);
   wl_surface_commit(surf);
   while (!configured && wl_display_dispatch(dpy) != -1) {}
-  printf("configured, starting frames\n"); fflush(stdout);
+  printf("configured\n"); fflush(stdout);
   frame_done(dpy, 0, 0);
-  while (frames < 200 && wl_display_dispatch(dpy) != -1) {}
+  while (frames < 300 && wl_display_dispatch(dpy) != -1) {}
   printf("done frames=%d\n", frames);
   return 0;
 }

@@ -398,6 +398,15 @@ static bool android_swap_buffers(struct wlr_renderer *wlr_renderer, pixman_regio
 		if (!buffer || buffer->egl_surface == EGL_NO_SURFACE || buffer->output != output)
 			continue;
 
+		wlr_egl_make_current_with_surface(renderer->egl, buffer->egl_surface, NULL);
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		if (access("/tmp/draw_white", F_OK) == 0) {
+			glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+			glDisable(GL_SCISSOR_TEST);
+			glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+			glClear(GL_COLOR_BUFFER_BIT);
+		}
+		glFlush();
 		return wlr_egl_swap_buffers(renderer->egl, buffer->egl_surface, NULL);
 	}
 

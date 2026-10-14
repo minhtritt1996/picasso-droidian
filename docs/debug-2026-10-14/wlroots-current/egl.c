@@ -492,7 +492,7 @@ static bool egl_init(struct wlr_egl *egl, EGLenum platform,
 
 	// Request a high priority context if possible
 	// TODO: only do this if we're running as the DRM master
-	bool request_high_priority = egl->exts.IMG_context_priority;
+	bool request_high_priority = !is_android && egl->exts.IMG_context_priority;
 
 	// Try to reschedule all of our rendering to be completed first. If it
 	// fails, it will fallback to the default priority (MEDIUM).
@@ -501,7 +501,7 @@ static bool egl_init(struct wlr_egl *egl, EGLenum platform,
 		attribs[atti++] = EGL_CONTEXT_PRIORITY_HIGH_IMG;
 	}
 
-	if (egl->exts.EXT_create_context_robustness) {
+	if (!is_android && egl->exts.EXT_create_context_robustness) {
 		attribs[atti++] = EGL_CONTEXT_OPENGL_RESET_NOTIFICATION_STRATEGY_EXT;
 		attribs[atti++] = EGL_LOSE_CONTEXT_ON_RESET_EXT;
 	}

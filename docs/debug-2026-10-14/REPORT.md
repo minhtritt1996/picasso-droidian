@@ -80,3 +80,13 @@
 - ftrace kgsl events tồn tại nhưng không fire. `/dev/mem` không tồn tại. Snapshot kgsl không expose.
 - Boot idle (mask đầy đủ) cũng reset sau ~10–20 phút — còn 1 nguồn reset chậm chưa rõ
   (không phải charger wdog, không modem SSR, không thermal).
+- Vendor driver TỰ SIGKILL process khi fault (bắt tại trận qua ftrace signal_generate:
+  sender chính phoc qua tgkill SI_TKILL; driver import raise@LIBC; kernel kgsl không giết).
+- LD_PRELOAD không chặn được (glibc raise() gọi syscall trực tiếp); ptrace cũng không (SIGKILL).
+- `nosuicide` (seccomp chặn tgkill-SIGKILL, test EPERM pass): process SỐNG qua fault,
+  red client chạy hết 200–300 frames, KHÔNG reset — spiral kill-restart-watchdog là nguồn reset chính!
+- Screenshot vẫn đen sau sống sót (ctx chết, draws bị skip) — sống ≠ hình.
+- LLC slice on/off: không đổi. Ép clocks: không đổi. Buffer 1/2/3/8: chết y hệt.
+- Damage tắt: chết ở ts cao (4162/8321) thay vì ts 2 — nhưng không cứu được.
+- Stock DTB (boot.img V12.5.7) vs rec-picasso.dtb: phần GPU GIỐNG HỆT → loại DT.
+- Mesa-CPU đỏ chuẩn → kernel/memory vô tội; bệnh khoanh vào vendor-GPU path.
