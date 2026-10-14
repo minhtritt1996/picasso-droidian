@@ -277,7 +277,7 @@ struct wlr_output *wlr_hwcomposer_add_output(struct wlr_backend *wlr_backend,
 	output->egl_window = HWCNativeWindowCreate(
 		output->hwc_width, output->hwc_height,
 		HAL_PIXEL_FORMAT_RGBA_8888, hwc_backend->impl->present, output);
-	HWCNativeWindowSetBufferCount(output->egl_window, 3);
+	HWCNativeWindowSetBufferCount(output->egl_window, 2);
 	native_window_set_usage(output->egl_window,
 		GRALLOC_USAGE_HW_RENDER | GRALLOC_USAGE_HW_TEXTURE |
 		GRALLOC_USAGE_HW_COMPOSER | GRALLOC_USAGE_HW_FB);

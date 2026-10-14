@@ -60,7 +60,23 @@
    release-fence/power-force/composition/fence-fix/bind-wait/draw-hooks).
 
 ## File kèm theo
-- `wlroots-current/`: 7 file nguồn wlroots trên máy sau mọi chỉnh sửa.
-- `egltests/egltest{,2,3,4}.c`: test EGL tối giản (pbuffer, swap, triangle, texture loopback).
+- `wlroots-current/`: 7 file nguồn wlroots trên máy sau mọi chỉnh sửa (+ `hwcomposer.h`).
+- `egltests/egltest{,2,3,4,5}.c`: test EGL tối giản (pbuffer, swap, triangle, texture loopback,
+  surfaceless+FBO qua Mesa — bản Mesa cho pixel ĐỎ đúng 255,0,0,255).
 - `fault-logs/`: `kgsl-fault-dmesg.txt` (full dmesg 1 boot fault), `kgsl-fault-phoc.txt` (33 dòng log phoc).
 - `phoc.ini`: config đang chạy trên máy.
+
+## Bổ sung sau commit đầu (phiên tiếp theo cùng ngày)
+- fence fix + đợi release 50ms trước render (field mới `hwc_last_present_fence`): present tăng,
+  acquire fence thật (`acq=46`), nhưng fault + đen không đổi.
+- `SetBufferCount(3→2)`: không đổi.
+- Ép GPU clocks/rails (`force_clk_on/rail/bus/no_nap`, 275MHz): fault y hệt → loại power-mgmt.
+- Mesa surfaceless+FBO: pixel ĐỎ đúng → kernel/memory vô tội; bệnh khoanh vào vendor/hybris path.
+- hybris `test_egl_configs` OK (68 configs); `test_glesv2` abort ở `create_hwcomposer_window`
+  (cần HWC service) — kèm reset máy.
+- GBM probe (`eglinfo -B`): treo → reset. Cấm đụng renderD128/GBM.
+- Không fbcon (`/dev/fb*` không tồn tại) → loại xung đột console.
+- UFS rule đã cài, không lỗi UFS. Nhiệt 35–42°C. Charger wdog tự pet.
+- ftrace kgsl events tồn tại nhưng không fire. `/dev/mem` không tồn tại. Snapshot kgsl không expose.
+- Boot idle (mask đầy đủ) cũng reset sau ~10–20 phút — còn 1 nguồn reset chậm chưa rõ
+  (không phải charger wdog, không modem SSR, không thermal).
