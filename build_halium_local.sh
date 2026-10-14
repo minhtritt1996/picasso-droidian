@@ -24,7 +24,7 @@ RAMDISK_OFFSET="0x01000000"
 TAGS_OFFSET="0x00000100"
 DTB_OFFSET="0x01f00000"
 
-CMDLINE="earlycon=msm_geni_serial,0x4a90000 androidboot.hardware=qcom androidboot.memcg=1 lpm_levels.sleep_disabled=1 video=vfb:640x400,bpp=32,memsize=3072000 msm_rtb.filter=0x237 service_locator.enable=1 swiotlb=2048 androidboot.usbcontroller=a600000.dwc3 loop.max_part=7 androidboot.usbconfigfs=true androidboot.selinux=permissive"
+CMDLINE="earlycon=msm_geni_serial,0x4a90000 androidboot.hardware=qcom androidboot.memcg=1 lpm_levels.sleep_disabled=1 msm_rtb.filter=0x237 service_locator.enable=1 swiotlb=2048 androidboot.usbcontroller=a600000.dwc3 loop.max_part=7 androidboot.usbconfigfs=true androidboot.selinux=permissive"
 
 echo "=== KHỞI ĐỘNG TIẾN TRÌNH BUILD HALIUM-BOOT CHO PICASSO ==="
 mkdir -p "${OUTPUT_DIR}"

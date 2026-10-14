@@ -11,12 +11,14 @@ OUT="$ROOT/output"
 # fall back to legacy local paths on the build machine.
 RD="$ROOT/repo/device/picasso/blobs/ramdisk.cpio.gz"
 DTB="$ROOT/repo/device/picasso/blobs/rec-picasso.dtb"
+[ -f "$RD" ] || RD="$ROOT/ramdisk.cpio.gz"
 [ -f "$RD" ] || RD="$OUT/unpack_good2/ramdisk.cpio.gz"
+[ -f "$DTB" ] || DTB="$ROOT/output/rec-picasso.dtb"
 [ -f "$DTB" ] || DTB="$OUT/rec-picasso.dtb"
 test -f "$RD" || { echo "missing ramdisk (see docs/02-boot-image-layout.md)"; exit 1; }
 test -f "$DTB" || { echo "missing rec-picasso.dtb"; exit 1; }
 
-CMDLINE="earlycon=msm_geni_serial,0x4a90000 androidboot.hardware=qcom androidboot.memcg=1 lpm_levels.sleep_disabled=1 video=vfb:640x400,bpp=32,memsize=3072000 msm_rtb.filter=0x237 service_locator.enable=1 swiotlb=2048 androidboot.usbcontroller=a600000.dwc3 loop.max_part=7 androidboot.usbconfigfs=true androidboot.selinux=permissive"
+CMDLINE="earlycon=msm_geni_serial,0x4a90000 androidboot.hardware=qcom androidboot.memcg=1 lpm_levels.sleep_disabled=1 msm_rtb.filter=0x237 service_locator.enable=1 swiotlb=2048 androidboot.usbcontroller=a600000.dwc3 loop.max_part=7 androidboot.usbconfigfs=true androidboot.selinux=permissive"
 # NOTE: no console= param (kernel registers ttyHS0, ttyMSM0 never binds).
 
 mkbootimg \
