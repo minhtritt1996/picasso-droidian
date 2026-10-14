@@ -124,4 +124,12 @@
 - GPU/ION/IOMMU code: GIỐNG HỆT (trừ trio đã revert).
 - Khác biệt duy nhất đáng kể trong memory: A16 TẮT `CONFIG_ION_SYSTEM_HEAP`,
   ta BẬT. Giả thuyết: heap sai thứ tự ưu tiên → writes void + fault khi sample.
-- Đang test: tắt ION_SYSTEM_HEAP, rebuild full, flash thử.
+- Đang test: tắt ION_SYSTEM_HEAP, rebuild full, flash thử (#48).
+- Kết quả test #48:
+  + Heap `system` vẫn tồn tại trong `/sys/kernel/debug/ion/heaps/` do Qualcomm MSM ION
+    khởi tạo heap dựa vào Device Tree (`qcom,msm-ion` node trong DTS), Kconfig upstream vô hiệu.
+  + Đối chiếu DTB của A16 (Infinity `infall-9.dtb`) vs stock recovery DTB: các node `qcom,ion`
+    và `qcom,kgsl-3d0` giống hệt 100%. Giả thuyết lệch ION heap giữa 2 bên bị bác bỏ.
+  + Chạy thử phosh trên #48: GPU fault vẫn tái diễn dạng null IB (`ctx 2 ts 4160 status 00800005 rb 0085/0085 ib1/ib2 0/0`).
+  + Phân tích mã lỗi `status 00800005`: bit 23 = `A6XX_RBBM_STATUS_GPU_BUSY_IGN_AHB`, kích hoạt bởi ngắt phần cứng `A6XX_INT_RBBM_HANG_DETECT` do bộ đếm `hang_detect_cycles` quá hạn khi GPU bận.
+
