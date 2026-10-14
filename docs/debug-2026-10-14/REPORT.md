@@ -110,3 +110,11 @@
 - Swap qua bind-mount host (reversible), LD_LIBRARY_PATH vô dụng với hybris linker.
 - Kết luận: blob version không phải biến số. Nghi phần cứng (silicon GPU) hoặc
   tầng hybris/kernel chung cho mọi blob. Cần verdict bằng Lineage tạm hoặc dump IB.
+
+## Bổ sung: kernel stock-GPU (#47) cũng chết, dạng khác
+- Revert toàn bộ trio Oct-12 về stock (khớp cây sm7250 A16 đang chạy tốt), rebuild + flash (#47).
+- Fault DẠNG MỚI: ib1/ib2 NULL (0000000000000000/0000), rb rỗng (0085/0085), ts 4160 —
+  khác hẳn dạng BF8000 của trio. Vẫn đen, vẫn chết.
+- Kết luận: trio trung tính; cả 2 biến thể kernel đều chết theo cách riêng.
+- Nghi mới: secure-memory/protection (writes void + fault khi access) hoặc spurious
+  hang-trip. Cần audit secure heap path hoặc dump IB.
