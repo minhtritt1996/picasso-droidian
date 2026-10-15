@@ -46,3 +46,14 @@ vmods/
 # Root logs
 *.log
 output/
+
+# Test media and packages
+*.png
+*.mp4
+*.deb
+*.so
+!packages/**
+/gcc_strace.txt
+/k30-wifi.sh
+/k30_present_colors.c
+/libsdm_poll_fix.c

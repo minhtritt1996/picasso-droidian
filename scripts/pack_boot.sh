@@ -8,11 +8,11 @@ set -e
 ROOT="${1:-$HOME/droidian}"
 OUT="$ROOT/output"
 # Ramdisk+DTB: prefer repo blobs (device/picasso/blobs, CI-friendly),
-# fall back to legacy local paths on the build machine.
-RD="$ROOT/repo/device/picasso/blobs/ramdisk.cpio.gz"
-DTB="$ROOT/repo/device/picasso/blobs/rec-picasso.dtb"
-[ -f "$RD" ] || RD="$ROOT/ramdisk.cpio.gz"
+RD="$ROOT/device/picasso/blobs/ramdisk.cpio.gz"
+DTB="$ROOT/device/picasso/blobs/rec-picasso.dtb"
+[ -f "$RD" ] || RD="$ROOT/repo/device/picasso/blobs/ramdisk.cpio.gz"
 [ -f "$RD" ] || RD="$OUT/unpack_good2/ramdisk.cpio.gz"
+[ -f "$DTB" ] || DTB="$ROOT/repo/device/picasso/blobs/rec-picasso.dtb"
 [ -f "$DTB" ] || DTB="$ROOT/output/rec-picasso.dtb"
 [ -f "$DTB" ] || DTB="$OUT/rec-picasso.dtb"
 test -f "$RD" || { echo "missing ramdisk (see docs/02-boot-image-layout.md)"; exit 1; }
