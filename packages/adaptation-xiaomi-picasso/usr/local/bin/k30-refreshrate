@@ -12,6 +12,7 @@ get_current_hz() {
 set_hz() {
     local hz="$1"
     su - "$TARGET_USER" -c "WAYLAND_DISPLAY=$WAYLAND_DISP XDG_RUNTIME_DIR=$XDG_RUNTIME wlr-randr --output HWCOMPOSER-1 --custom-mode 1080x2400@${hz}Hz"
+    su - "$TARGET_USER" -c "notify-send -i video-display -a 'Màn hình' 'Tần số quét' 'Đã chuyển sang ${hz}Hz'" 2>/dev/null || true
     echo "Switched display to ${hz}Hz"
 }
 
