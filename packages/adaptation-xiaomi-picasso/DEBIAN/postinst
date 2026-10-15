@@ -12,6 +12,10 @@ depmod -a 2>/dev/null || true
 # Set permissions
 chmod +x /usr/local/bin/* 2>/dev/null || true
 
+# Android init refuses to parse group/other-writable vendor rc files
+# ("Skipping insecure file"), so keep them strictly 644 root:root.
+chmod 644 /usr/lib/droid-vendor-overlay/etc/init/*.rc 2>/dev/null || true
+
 # Compile glib schemas
 if command -v glib-compile-schemas >/dev/null 2>&1; then
     glib-compile-schemas /usr/share/glib-2.0/schemas/ 2>/dev/null || true

@@ -13,8 +13,12 @@ if [ ! -d "$PKG_DIR/DEBIAN" ]; then
     exit 1
 fi
 
-chmod 755 "$PKG_DIR/DEBIAN/postinst" 2>/dev/null || true
-chmod +x "$PKG_DIR/usr/local/bin/"* 2>/dev/null || true
+# Normalize permissions before packaging: dpkg preserves archive modes, and
+# Android init skips group/other-writable vendor rc files as insecure.
+find "$PKG_DIR" -type d -exec chmod 755 {} +
+find "$PKG_DIR" -type f -exec chmod 644 {} +
+chmod 755 "$PKG_DIR/DEBIAN/postinst"
+find "$PKG_DIR/usr/local/bin" -type f -exec chmod 755 {} +
 
 VERSION=$(grep '^Version:' "$PKG_DIR/DEBIAN/control" | awk '{print $2}')
 [ -n "$VERSION" ] || VERSION="1.1.0"

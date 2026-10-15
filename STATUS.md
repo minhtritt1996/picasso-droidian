@@ -22,8 +22,11 @@ Live, verified state of the connected device. Details live in `docs/`
 
 ## Flashed / installed state
 - boot image: `output/halium-boot-picasso.img` (md5 `8f911039d22f443fb6114866d8610e03`).
-- adaptation-xiaomi-picasso **v1.2.0** — signed `wlan.ko`, `k30-wifi.service` v2,
-  `k30-display-power.service`, boot-completed drop-in, memtrack overlay.
+- adaptation-xiaomi-picasso **v1.2.1** — signed `wlan.ko`, `k30-wifi.service` v2,
+  `k30-display-power.service`, boot-completed drop-in, memtrack overlay;
+  v1.2.1 hardens the container binds (idempotent + `RemainAfterExit`), fixes
+  vendor rc file modes (init skipped group-writable files) and bounds the
+  boot-completed `setprop` with timeout + retries.
 - Android container: `memtrack-hal` disabled (vendor overlay), `sys.boot_completed`
   set via the container's own `setprop`; journal vacuumed (800M -> ~70M).
 
