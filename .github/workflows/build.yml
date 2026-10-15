@@ -22,9 +22,8 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             git make bc bison flex libssl-dev libelf-dev \
             gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi binutils-aarch64-linux-gnu \
-            python2 cpio kmod device-tree-compiler curl
-          sudo update-alternatives --install /usr/bin/python python /usr/bin/python2 10 || true
-          python --version
+            python3 cpio kmod device-tree-compiler curl
+          python3 --version
 
       - name: Proton clang 13 (tested toolchain)
         run: |
@@ -57,15 +56,22 @@ jobs:
           export PATH="$HOME/proton-clang/bin:$PATH"
           make O=out_halium ARCH=arm64 CC=clang CLANG_TRIPLE=aarch64-linux-gnu- \
             CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
-            PYTHON=python2 olddefconfig
+            PYTHON=python3 olddefconfig
           make O=out_halium ARCH=arm64 CC=clang CLANG_TRIPLE=aarch64-linux-gnu- \
             CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
-            PYTHON=python2 -j"$(nproc)" Image.gz dtbs
+            PYTHON=python3 -j"$(nproc)" Image.gz dtbs
+          make O=out_halium ARCH=arm64 CC=clang CLANG_TRIPLE=aarch64-linux-gnu- \
+            CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
+            PYTHON=python3 -j"$(nproc)" modules
+          make O=out_halium ARCH=arm64 CC=clang CLANG_TRIPLE=aarch64-linux-gnu- \
+            CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
+            PYTHON=python3 INSTALL_MOD_PATH="$PWD/modstage" INSTALL_MOD_STRIP=1 modules_install
+          tar czf ../kernel-modules.tar.gz -C modstage/lib/modules .
           cat out_halium/include/config/kernel.release
 
       - name: Pack boot.img (proven picasso layout)
         run: |
-          CMDLINE="earlycon=msm_geni_serial,0x4a90000 androidboot.hardware=qcom androidboot.memcg=1 lpm_levels.sleep_disabled=1 video=vfb:640x400,bpp=32,memsize=3072000 msm_rtb.filter=0x237 service_locator.enable=1 swiotlb=2048 androidboot.usbcontroller=a600000.dwc3 loop.max_part=7 androidboot.usbconfigfs=true androidboot.selinux=permissive"
+          CMDLINE="earlycon=msm_geni_serial,0x4a90000 androidboot.hardware=qcom androidboot.memcg=1 lpm_levels.sleep_disabled=1 msm_rtb.filter=0x237 service_locator.enable=1 swiotlb=2048 androidboot.usbcontroller=a600000.dwc3 loop.max_part=7 androidboot.usbconfigfs=true androidboot.selinux=permissive"
           python3 ~/tools/mkbootimg.py \
             --kernel kernel-src/out_halium/arch/arm64/boot/Image.gz \
             --ramdisk device/picasso/blobs/ramdisk.cpio.gz \
@@ -78,8 +84,10 @@ jobs:
           md5sum halium-boot-picasso.img
           ls -la halium-boot-picasso.img
 
-      - name: Upload boot.img
+      - name: Upload boot.img + modules
         uses: actions/upload-artifact@v4
         with:
           name: halium-boot-picasso
-          path: halium-boot-picasso.img
+          path: |
+            halium-boot-picasso.img
+            kernel-modules.tar.gz

@@ -1,4 +1,11 @@
 # WiFi + DroidSpaces final status
+
+> **SUPERSEDED (2026-10-15):** Wi-Fi now uses the signed in-tree `wlan.ko`
+> via `k30-wifi.service` — see `docs/08-wifi-bringup-tested.md`. The
+> vermagic-patched vendor module set (`/root/vmods/`, `logkstub.ko`) no longer
+> loads because the kernel enforces MODULE_SIG_FORCE + MODVERSIONS.
+> The DroidSpaces findings below are kept as historical reference.
+
 ## WiFi: WORKS (automated)
 - Kernel: bis8-equivalent (4.19.113-lineage-picasso+, CLD builtin ON,
   REMOTEPROC/RTB/core-4/netfilter-7 OFF, DS patches reverted).

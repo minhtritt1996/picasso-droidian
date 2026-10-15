@@ -1,28 +1,53 @@
-# WiFi bring-up (TESTED 2026-10-11/12, kernel 4.19.113-lineage-picasso+)
+# WiFi bring-up (TESTED 2026-10-15, kernel 4.19.113-lineage-g5f44e3254-dirty)
 
-## Result
-Scan + NM connect + ping 8.8.8.8. Automated by `picasso-wifi.service`
-(~55s after boot, zero manual waiting).
+## Status: WORKING — automated by `k30-wifi.service`
+Verified on hardware: scan, WPA2 association (NetworkManager manual connect),
+DHCP address assignment and internet ping (0% loss).
 
-## Recipe
-1. `/lib/firmware`: adsp.*, bdwlan.*, bdf_*.bin, wlanmdsp.mbn (see firmware-list.txt)
-2. `lxc-start -d -n android`, poll `dmesg` for `WLAN FW is ready` (~25-30s)
-3. Wait 30s more (settle), then:
-   - `insmod /root/logkstub.ko` (stub EXPORTs `uncached_logk`;
-     proper fix = CONFIG_QCOM_RTB=y, kept OFF because RTB was a
-     bisect suspect — retest later)
-   - `insmod /root/vmods/qca_cld3_wlan.ko` (vermagic-patched, see patch-modules.sh)
-4. `wlan0/wlan1/p2p0` appear. `nmcli connection up '<SSID>' ifname wlan0`
-   with the profile set to `autoconnect no`.
+## Current recipe (in-tree driver, MODVERSIONS + signed modules)
+1. Firmware in `/lib/firmware`: `adsp.*`, `bdwlan.*`, `bdf_*.bin`, `wlanmdsp.mbn`
+   (MAC address falls back to the container's `wlan_mac.bin` via icnss sysfs).
+2. `k30-wifi.service` (oneshot, `Restart=on-failure`) runs
+   `/usr/local/bin/k30-wifi-init.sh`, which:
+   - waits for the Android container to be RUNNING,
+   - **settle gate: container must be >= 240s old**,
+   - `insmod /lib/modules/$(uname -r)/updates/wlan.ko` (signed with
+     `certs/signing_key.pem` from the kernel build; kernel enforces
+     `CONFIG_MODVERSIONS=y` + `CONFIG_MODULE_SIG_FORCE=y`),
+   - `mknod /dev/wlan c <major> 0` (major from `/proc/devices`, char dev
+     name `qcwlanstate`) and `echo ON > /dev/wlan` until `wlan0` appears.
+3. The char-device `ON` triggers the icnss FW download; dmesg shows
+   `FW ready event received`, then `wlan0/wlan1/p2p0` are created.
 
-## Two hard lessons (each cost multiple silent SoC resets)
-1. **Settle wait is mandatory.** insmod while cnss-daemon initializes
-   (~first minutes after container start) wedges the SoC with no logs.
-   Polling FW-ready + 30s is proven; 4.5min also proven (slower, safer).
-2. **NM autoconnect must stay off** on wifi profiles. Autoconnect firing
-   at interface appearance races FW-attach the same way. Connect manually.
+## Hard rules (each cost multiple silent SoC resets historically)
+1. **Never insmod while the container is starting** — the cnss/icnss
+   FW-attach race wedges the SoC silently (no logs, no panic). The 240s
+   container-age gate is mandatory.
+2. **Keep NM autoconnect OFF on all Wi-Fi profiles**:
+   `nmcli connection modify <name> connection.autoconnect no`.
+   Autoconnect firing at interface appearance races FW attach the same way.
+   Connect manually (phosh network menu, or
+   `nmcli connection up <name> ifname wlan0`).
+
+## Why the old flow died (regression 2026-10-15, fixed)
+- Kernel now enforces `CONFIG_MODVERSIONS=y` + `CONFIG_MODULE_SIG_FORCE=y`.
+  The old vendor `qca_cld3_wlan.ko` / `vmods/` set is unsigned and carries no
+  CRCs -> `insmod` fails with `Required key not available`.
+- `logkstub.ko` is NOT needed by the in-tree driver (it does not reference
+  `uncached_logk`); it was only required by the vendor module build.
+- The in-tree `wlan.ko` must be **rebuilt with every kernel build** and
+  re-installed on the rootfs. `kernel/build_kernel.sh` now builds `modules`,
+  strips + signs them and packs `output/kernel-modules-<release>.tar.gz`.
+
+## Build & install the module (current procedure)
+```bash
+# on the build machine (same tree as the kernel build)
+./kernel/build_kernel.sh ~/droidian         # also builds modules tarball
+# on the device
+tar xzf kernel-modules-<release>.tar.gz -C /
+depmod -a $(uname -r)
+systemctl restart k30-wifi.service
+```
 
 ## Open
-- Drop logkstub by re-enabling QCOM_RTB (needs retest).
-- QCA_CLD_WLAN built-in is ON (harmless; vendor module loads by name
-  since autoconnect is off and no ghost collision occurs at load time).
+- `grim` screenshots still hang (wl_shm); separate issue, tracked in STATUS.md.

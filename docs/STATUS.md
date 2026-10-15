@@ -48,9 +48,9 @@ Device boots directly into hardware-accelerated Phosh UI. Physical screen output
 
 ### 7. Wi-Fi
 - **Chipset:** Qualcomm WCN3990
-- **Driver:** `wlan_cld3.ko` (QCA CLD v5.2) + `logkstub.ko`
-- **Status:** **WORKING**
-- **Details:** Full scanning, WPA2 association, DHCP address assignment, and internet routing verified.
+- **Driver:** in-tree `wlan.ko` (QCA CLD, `CONFIG_QCA_CLD_WLAN=m`), signed with the build-time kernel key, loaded on demand
+- **Status:** **WORKING** (verified 2026-10-15; MRU receipt updated after regression fix)
+- **Details:** `k30-wifi.service` waits for the Android container to settle (>=240s), `insmod`s `updates/wlan.ko`, registers `/dev/wlan` and triggers FW attach; `wlan0/wlan1/p2p0` appear. Scanning, WPA2 association, DHCP and internet ping verified. NetworkManager autoconnect must stay **off** on Wi-Fi profiles (FW-attach race => silent SoC reset).
 
 ### 8. Cellular Modem
 - **Chipset:** Snapdragon X52 5G (Qualcomm SDM7250)

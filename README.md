@@ -10,7 +10,7 @@ Boots directly into hardware-accelerated Phosh UI. Full support for physical dis
 
 | Subsystem | Component / Tech | Status | Notes |
 |---|---|:---:|---|
-| **Boot & Kernel** | Linux 4.19.113 LineageOS, Halium-boot v2 | ✅ **WORKING** | Boots directly to userspace + LXC Android container + SSH (USB RNDIS / Wi-Fi). |
+| **Boot & Kernel** | Linux 4.19.113 LineageOS, Halium-boot v2 | ✅ **WORKING** | Boots directly to userspace + LXC Android container + SSH (USB RNDIS / Wi-Fi). Module enforcement: MODVERSIONS + signatures (`-lineage-picasso+` releases). |
 | **Display** | 6.67" IPS LCD (1080x2400 @ 120Hz) | ✅ **WORKING** | Panel initialization via DSI. Persistent backlight control (`4095/4095`). |
 | **GPU Acceleration** | Qualcomm Adreno 620 (`libGLESv2_adreno.so`) | ✅ **WORKING** | Hardware accelerated via GLES2/3.2 + HWC2. Wlroots deadlock bug resolved. |
 | **User Interface** | Phoc (Compositor) + Phosh (Shell) | ✅ **WORKING** | Stable execution bypassed gnome-session timeout via direct wrapper. Autostarts on boot. |
@@ -19,7 +19,7 @@ Boots directly into hardware-accelerated Phosh UI. Full support for physical dis
 | **Sensors** | Sensorfw + `iio-sensor-proxy` | ✅ **WORKING** | Accelerometer, Ambient Light Sensor, and Compass streaming data in real-time. |
 | **Battery & Charging** | Qualcomm SMB1396 / PM7250B BMS | ✅ **WORKING** | Battery percentage, voltage, and charging thermal regulator fully reported. |
 | **Haptics & Flash** | Vibrator motor + Dual-LED Flash | ✅ **WORKING** | Controllable via `/sys/class/timed_output/vibrator` and `/sys/class/leds/led:torch_*`. |
-| **Wi-Fi** | Qualcomm WCN3990 (Wi-Fi 5) | ✅ **WORKING** | Tested via `wlan_cld3.ko`. Scans, connects WPA2, and pings external internet. |
+| **Wi-Fi** | Qualcomm WCN3990 (Wi-Fi 5) | ✅ **WORKING** | Signed in-tree `wlan.ko`, loaded by `k30-wifi.service` after container settle. Scan + WPA2 + DHCP + internet verified (2026-10-15). Keep NM autoconnect **off** on Wi-Fi profiles. |
 | **Cellular Modem** | Snapdragon X52 5G (oFono + ModemManager) | ⚠️ **PARTIAL** | Modem detected (`/Modem/0`), IMEI readable. Power management ready. |
 | **Audio** | ALSA + PulseAudio (`lito-mtp-snd-card`) | ⚠️ **PARTIAL** | Kernel soundcard registered; PulseAudio starts with `droid_card.primary`. |
 | **Bluetooth** | Qualcomm WCN3990 Bluetooth 5.1 | ⚠️ **IN PROGRESS** | BlueZ active, `hci_vhci.ko` loaded, proxying through `bluebinder`. |
@@ -61,7 +61,7 @@ Boots directly into hardware-accelerated Phosh UI. Full support for physical dis
 ## 🚀 Building & Flashing
 
 ```bash
-# 1. Build kernel
+# 1. Build kernel (Image.gz + dtbs + modules tarball)
 ./kernel/build_kernel.sh ~/droidian
 
 # 2. Pack boot image
@@ -69,4 +69,8 @@ Boots directly into hardware-accelerated Phosh UI. Full support for physical dis
 
 # 3. Flash to device (via fastboot)
 fastboot flash boot output/halium-boot-picasso.img
+
+# 4. Install kernel modules on the device rootfs — REQUIRED after every
+#    kernel build (Wi-Fi/audio modules must match the flashed kernel):
+#    on the device: tar xzf kernel-modules-<release>.tar.gz -C /
 ```
