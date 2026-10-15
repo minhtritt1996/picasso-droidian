@@ -68,3 +68,17 @@ Device boots directly into hardware-accelerated Phosh UI. Physical screen output
 - **Chipset:** WCN3990 Bluetooth 5.1
 - **Stack:** BlueZ + `bluebinder` + `hci_vhci.ko`
 - **Status:** **IN PROGRESS**
+
+## Known issues (open, 2026-10-15)
+
+- **loop0 read errors:** the kernel logs ~15-30 `print_req_error: I/O error,
+  dev loop0` per boot while reading the rootfs image `/userdata/rootfs.img`
+  (image size matches the loop device, so not a truncation issue). Present on
+  every recent boot and pre-dates the 2026-10-15 work. Recommend backing up
+  `/userdata/rootfs.img` and running `e2fsck -f` on it from the host/recovery
+  before the error pattern grows.
+- **grim/screenshot:** hangs in `wl_shm` (`grim` over SSH); not fixed yet.
+- **Boot races (fixed 2026-10-15 in v1.2.2):** `picasso-audio-init` used to
+  give the ASoC card only 30s (card registers around t=40s+ on cold boot) and
+  `nfcd` had no retry while `/dev/hwbinder` appears late — both now robust
+  (5-minute audio wait, nfcd `Restart=on-failure`).

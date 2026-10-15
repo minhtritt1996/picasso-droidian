@@ -1,8 +1,9 @@
 #!/bin/bash
 # Initialize audio routing for Xiaomi Redmi K30 5G (picasso)
 
-# Wait for sound card to appear (ADSP boot)
-for i in $(seq 1 30); do
+# Wait for sound card to appear (ADSP boot). On cold boot the ASoC card can
+# take >60s to register (kona-asoc-snd probes around t=40s), so wait up to 5 min.
+for i in $(seq 1 300); do
     if [ -e /dev/snd/controlC0 ]; then
         break
     fi
