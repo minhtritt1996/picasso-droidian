@@ -10,20 +10,26 @@ depmod -a 4.19.113-lineage-picasso+ 2>/dev/null || true
 depmod -a 2>/dev/null || true
 
 # Set permissions
-chmod +x /usr/local/bin/phosh-wrapper /usr/local/bin/panel-on /usr/local/bin/picasso-audio-init /usr/local/bin/k30-audio-test 2>/dev/null || true
+chmod +x /usr/local/bin/* 2>/dev/null || true
+
+# Compile glib schemas
+if command -v glib-compile-schemas >/dev/null 2>&1; then
+    glib-compile-schemas /usr/share/glib-2.0/schemas/ 2>/dev/null || true
+fi
 
 # Reload udev rules
 udevadm control --reload-rules || true
 udevadm trigger || true
 
 # Disable UFS runtime PM, clock gating and clock scaling immediately
-if [ -f /sys/bus/platform/devices/1d84000.ufshc/power/control ]; then
-    echo 0 > /sys/bus/platform/devices/1d84000.ufshc/clkgate_enable 2>/dev/null || true
-    echo 0 > /sys/bus/platform/devices/1d84000.ufshc/clkscale_enable 2>/dev/null || true
-    echo 0 > /sys/bus/platform/devices/1d84000.ufshc/auto_hibern8 2>/dev/null || true
-    echo 0 > /sys/bus/platform/devices/1d84000.ufshc/rpm_lvl 2>/dev/null || true
+for node in clkgate_enable clkscale_enable auto_hibern8 rpm_lvl; do
+    f="/sys/bus/platform/devices/1d84000.ufshc/$node"
+    [ -w "$f" ] && echo 0 > "$f" 2>/dev/null || true
+done
+if [ -w /sys/bus/platform/devices/1d84000.ufshc/power/control ]; then
     echo on > /sys/bus/platform/devices/1d84000.ufshc/power/control 2>/dev/null || true
 fi
+
 
 # Update dconf database for system-wide background settings
 if command -v dconf >/dev/null 2>&1; then

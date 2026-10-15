@@ -30,4 +30,6 @@ mkbootimg \
   --tags_offset 0x100 --dtb_offset 0x1728000 \
   --header_version 2 --cmdline "$CMDLINE" \
   -o "$OUT/halium-boot-picasso.img"
-md5sum "$OUT/halium-boot-picasso.img"
+cp -f "$OUT/halium-boot-picasso.img" "$OUT/boot-picasso-droidian.img"
+md5sum "$OUT/halium-boot-picasso.img" "$OUT/boot-picasso-droidian.img"
+
