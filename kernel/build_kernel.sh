@@ -54,4 +54,19 @@ make O=out_halium ARCH=arm64 $CCENV \
   CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
   PYTHON=python2 -j"$(nproc)" Image.gz dtbs
 ls -la out_halium/arch/arm64/boot/Image.gz
+
+# Modules: required on the device rootfs (Wi-Fi etc.). Stripped AND signed
+# with the kernel's certs/signing_key.pem (kernel enforces MODULE_SIG_FORCE).
+make O=out_halium ARCH=arm64 $CCENV \
+  CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
+  PYTHON=python2 -j"$(nproc)" modules
+rm -rf out_modules
+make O=out_halium ARCH=arm64 $CCENV \
+  CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
+  PYTHON=python2 INSTALL_MOD_PATH="$K/out_modules" INSTALL_MOD_STRIP=1 modules_install
+REL="$(cat out_halium/include/config/kernel.release)"
+mkdir -p "$ROOT/output"
+tar czf "$ROOT/output/kernel-modules-$REL.tar.gz" -C "$K/out_modules" lib
+echo "modules tarball: $ROOT/output/kernel-modules-$REL.tar.gz"
+echo "device: tar xzf kernel-modules-$REL.tar.gz -C / && depmod -a $REL"
 cat out_halium/include/config/kernel.release
