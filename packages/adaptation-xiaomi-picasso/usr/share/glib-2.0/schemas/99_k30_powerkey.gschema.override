@@ -7,3 +7,7 @@ disable-lock-screen=false
 
 [org.gnome.desktop.screensaver]
 lock-enabled=true
+
+[org.gnome.settings-daemon.peripherals.touchscreen]
+orientation-lock=false
+
