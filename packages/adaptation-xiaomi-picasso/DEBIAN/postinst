@@ -15,6 +15,8 @@ udevadm trigger || true
 if [ -f /sys/bus/platform/devices/1d84000.ufshc/power/control ]; then
     echo 0 > /sys/bus/platform/devices/1d84000.ufshc/clkgate_enable 2>/dev/null || true
     echo 0 > /sys/bus/platform/devices/1d84000.ufshc/clkscale_enable 2>/dev/null || true
+    echo 0 > /sys/bus/platform/devices/1d84000.ufshc/auto_hibern8 2>/dev/null || true
+    echo 0 > /sys/bus/platform/devices/1d84000.ufshc/rpm_lvl 2>/dev/null || true
     echo on > /sys/bus/platform/devices/1d84000.ufshc/power/control 2>/dev/null || true
 fi
 
@@ -34,6 +36,7 @@ sysctl -p /etc/sysctl.d/99-disable-coredump.conf 2>/dev/null || true
 # Enable systemd services
 systemctl daemon-reload
 systemctl enable backlight-boot.service || true
+systemctl enable k30-powerkey.service k30-wifi.service bluebinder.service k30-pmic-pet.service || true
 
 # Mask conflict / problematic services
 systemctl mask droidian-fpd.service picasso-audio.service picasso-wifi.service mobile-power-saver.service pulseaudio.service pulseaudio.socket 2>/dev/null || true

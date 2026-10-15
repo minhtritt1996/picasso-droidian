@@ -1,0 +1,11 @@
+[Unit]
+Description=Qualcomm CLD3 WiFi Initializer
+After=android-mount.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/bin/k30-wifi-init.sh
+
+[Install]
+WantedBy=multi-user.target
