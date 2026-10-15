@@ -1,5 +1,5 @@
 Package: adaptation-xiaomi-picasso
-Version: 1.1.0
+Version: 1.2.0
 Architecture: arm64
 Maintainer: Minh Tri <minhtritt1996@gmail.com>
 Depends: adaptation-android-generic, phosh, phoc
@@ -9,6 +9,7 @@ Section: misc
 Priority: optional
 Description: Hardware adaptation package for Xiaomi Redmi K30 5G (picasso)
  Provides GPU patch, hardware acceleration, panel backlight service,
- direct phosh launcher, Wi-Fi/Bluetooth kernel modules, ALSA audio,
- 60Hz/120Hz display switcher, camera/torch rules, and auto-rotation.
+ direct phosh launcher, Wi-Fi bringup (signed in-tree wlan.ko),
+ display power initializer, ALSA audio, 60Hz/120Hz display switcher,
+ camera/torch rules, boot-completed signalling and auto-rotation.
 

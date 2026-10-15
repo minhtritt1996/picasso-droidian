@@ -47,6 +47,7 @@ sysctl -p /etc/sysctl.d/99-disable-coredump.conf 2>/dev/null || true
 # Enable systemd services
 systemctl daemon-reload
 systemctl enable backlight-boot.service || true
+systemctl enable k30-display-power.service || true
 systemctl enable k30-powerkey.service k30-wifi.service bluebinder.service k30-pmic-pet.service picasso-audio.service || true
 
 # Mask conflict / problematic services

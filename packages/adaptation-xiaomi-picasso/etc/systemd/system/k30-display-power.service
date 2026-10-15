@@ -1,0 +1,13 @@
+[Unit]
+Description=K30 5G Display and Backlight Power Initializer
+DefaultDependencies=no
+After=sys-kernel-debug.mount
+Before=phosh.service display-manager.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/k30-display-power.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=sysinit.target multi-user.target
