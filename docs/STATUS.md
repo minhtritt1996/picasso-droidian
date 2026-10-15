@@ -66,7 +66,7 @@ Device boots directly into hardware-accelerated Phosh UI. Physical screen output
 
 ### 10. Bluetooth
 - **Chipset:** WCN3990 Bluetooth 5.1
-- **Stack:** BlueZ + `bluebinder` + `hci_vhci.ko`
+- **Stack:** BlueZ + `bluebinder` + kernel VHCI (built-in, `/dev/vhci`)
 - **Status:** **IN PROGRESS**
 
 ## Known issues (open, 2026-10-15)
