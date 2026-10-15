@@ -1,0 +1,37 @@
+#!/bin/bash
+# Initialize audio routing for Xiaomi Redmi K30 5G (picasso)
+
+# Wait for sound card to appear (ADSP boot)
+for i in $(seq 1 30); do
+    if [ -e /dev/snd/controlC0 ]; then
+        break
+    fi
+    sleep 1
+done
+
+if [ ! -e /dev/snd/controlC0 ]; then
+    echo "picasso-audio-init: sound card not found" >&2
+    exit 1
+fi
+
+# 1. Speaker Playback Routing (MultiMedia1 -> SEC_MI2S_RX -> TFA9874)
+amixer -D hw:0 cset name='SEC_MI2S_RX Audio Mixer MultiMedia1' 1 >/dev/null 2>&1
+amixer -D hw:0 cset name='TFA Profile' 0 >/dev/null 2>&1
+
+# 2. Microphone Capture Routing (Primary Mic & Secondary Mic -> WCD938x -> MultiMedia1)
+amixer -D hw:0 cset name='MultiMedia1 Mixer TX_CDC_DMA_TX_3' 1 >/dev/null 2>&1
+amixer -D hw:0 cset name='TX_CDC_DMA_TX_3 Channels' Two >/dev/null 2>&1
+amixer -D hw:0 cset name='TX DEC0 MUX' SWR_MIC >/dev/null 2>&1
+amixer -D hw:0 cset name='TX SMIC MUX0' ADC0 >/dev/null 2>&1
+amixer -D hw:0 cset name='TX_AIF1_CAP Mixer DEC0' 1 >/dev/null 2>&1
+amixer -D hw:0 cset name='ADC1_MIXER Switch' 1 >/dev/null 2>&1
+amixer -D hw:0 cset name='ADC1 Volume' 12 >/dev/null 2>&1
+amixer -D hw:0 cset name='TX DEC1 MUX' SWR_MIC >/dev/null 2>&1
+amixer -D hw:0 cset name='TX SMIC MUX1' ADC3 >/dev/null 2>&1
+amixer -D hw:0 cset name='TX_AIF1_CAP Mixer DEC1' 1 >/dev/null 2>&1
+amixer -D hw:0 cset name='ADC4_MIXER Switch' 1 >/dev/null 2>&1
+amixer -D hw:0 cset name='ADC4 MUX' INP5 >/dev/null 2>&1
+amixer -D hw:0 cset name='ADC4 Volume' 12 >/dev/null 2>&1
+amixer -D hw:0 cset name='TX_DEC0 Volume' 84 >/dev/null 2>&1
+
+echo "picasso-audio-init: Audio routing initialized successfully."

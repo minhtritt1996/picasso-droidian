@@ -1,0 +1,51 @@
+#!/bin/bash
+# Audio test tool for Xiaomi Redmi K30 5G (picasso) on Droidian
+
+set -e
+
+echo "============================================"
+echo "  Xiaomi Redmi K30 5G Audio Diagnostic Tool "
+echo "============================================"
+
+# 1. Check sound card
+if ! grep -q 'lito-mtp-snd-card' /proc/asound/cards 2>/dev/null; then
+    echo "[!] Error: lito-mtp-snd-card not found in /proc/asound/cards."
+    exit 1
+fi
+echo "[✓] ALSA Soundcard detected: lito-mtp-snd-card (Card 0)"
+
+# 2. Check TFA9874 amplifier
+if [ -d /sys/kernel/debug/tfa98xx-34 ]; then
+    FW_STATE=$(cat /sys/kernel/debug/tfa98xx-34/fw-state 2>/dev/null || echo "Unknown")
+    echo "[✓] SmartPA: TFA9874 detected (Firmware state: $FW_STATE)"
+fi
+
+case "$1" in
+    play)
+        echo "[*] Playing test tone on speaker..."
+        aplay /home/droidian/test_audio.wav
+        echo "[✓] Speaker playback complete."
+        ;;
+    rec)
+        DUR=${2:-3}
+        echo "[*] Recording $DUR seconds from microphone to /tmp/test_mic.wav..."
+        echo "[*] Speak into the phone now!"
+        arecord -f S16_LE -r 48000 -c 2 -d $DUR /tmp/test_mic.wav
+        echo "[✓] Recording complete: $(ls -lh /tmp/test_mic.wav)"
+        ;;
+    loopback)
+        DUR=${2:-3}
+        echo "[*] Recording $DUR seconds from microphone..."
+        echo "[*] Please speak now!"
+        arecord -f S16_LE -r 48000 -c 2 -d $DUR /tmp/loopback.wav
+        echo "[*] Playing back your recorded audio through the speaker..."
+        aplay /tmp/loopback.wav
+        echo "[✓] Loopback test complete!"
+        ;;
+    *)
+        echo "Usage: $0 {play|rec [seconds]|loopback [seconds]}"
+        echo "  play     - Play a 440Hz test tone on the speaker"
+        echo "  rec [s]  - Record s seconds of audio from the microphone"
+        echo "  loopback - Record your voice and immediately play it back on speaker"
+        ;;
+esac

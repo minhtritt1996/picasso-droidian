@@ -1,0 +1,12 @@
+[Unit]
+Description=Xiaomi Redmi K30 5G Audio Initialization
+After=adspboot.service sound.target
+Wants=sound.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/bin/picasso-audio-init
+
+[Install]
+WantedBy=multi-user.target
