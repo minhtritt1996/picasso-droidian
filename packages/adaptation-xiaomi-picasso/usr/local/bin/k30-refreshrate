@@ -1,0 +1,41 @@
+#!/bin/bash
+# Helper to switch refresh rate between 60Hz and 120Hz on Redmi K30 5G (picasso)
+
+TARGET_USER="droidian"
+XDG_RUNTIME="/run/user/32011"
+WAYLAND_DISP="wayland-0"
+
+get_current_hz() {
+    su - "$TARGET_USER" -c "WAYLAND_DISPLAY=$WAYLAND_DISP XDG_RUNTIME_DIR=$XDG_RUNTIME wlr-randr" 2>/dev/null | grep -oE "[0-9]+\.[0-9]+ Hz \(current\)" | awk '{print int($1)}'
+}
+
+set_hz() {
+    local hz="$1"
+    su - "$TARGET_USER" -c "WAYLAND_DISPLAY=$WAYLAND_DISP XDG_RUNTIME_DIR=$XDG_RUNTIME wlr-randr --output HWCOMPOSER-1 --custom-mode 1080x2400@${hz}Hz"
+    echo "Switched display to ${hz}Hz"
+}
+
+case "$1" in
+    120)
+        set_hz 120
+        ;;
+    60)
+        set_hz 60
+        ;;
+    status)
+        current=$(get_current_hz)
+        echo "Current refresh rate: ${current:-unknown}Hz"
+        ;;
+    toggle|"")
+        current=$(get_current_hz)
+        if [ "$current" = "120" ]; then
+            set_hz 60
+        else
+            set_hz 120
+        fi
+        ;;
+    *)
+        echo "Usage: $0 [60|120|toggle|status]"
+        exit 1
+        ;;
+esac
