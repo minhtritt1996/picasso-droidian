@@ -12,7 +12,8 @@ for i in $(seq 1 60); do
 done
 
 if [ -z "$MAJOR" ]; then
-    MAJOR=495
+    echo "wlan character device not found in /proc/devices"
+    exit 1
 fi
 
 rm -f /dev/wlan

@@ -2,7 +2,12 @@
 set -e
 
 # Update module dependencies
-depmod -a 4.19.113-lineage-picasso+ || depmod -a || true
+CURRENT_KVER=$(uname -r)
+if [ -n "$CURRENT_KVER" ] && [ ! -d "/lib/modules/$CURRENT_KVER" ]; then
+    ln -snf /lib/modules/4.19.113-lineage-picasso+ "/lib/modules/$CURRENT_KVER" 2>/dev/null || true
+fi
+depmod -a 4.19.113-lineage-picasso+ 2>/dev/null || true
+depmod -a 2>/dev/null || true
 
 # Set permissions
 chmod +x /usr/local/bin/phosh-wrapper /usr/local/bin/panel-on 2>/dev/null || true
@@ -25,10 +30,10 @@ if command -v dconf >/dev/null 2>&1; then
     dconf update || true
 fi
 
-# Disable kernel coredump to prevent translation fault oops
+# Disable kernel coredump safely to prevent translation fault oops
 mkdir -p /etc/sysctl.d
 cat << 'EOF' > /etc/sysctl.d/99-disable-coredump.conf
-kernel.core_pattern =
+kernel.core_pattern = |/bin/false
 fs.suid_dumpable = 0
 EOF
 sysctl -p /etc/sysctl.d/99-disable-coredump.conf 2>/dev/null || true
