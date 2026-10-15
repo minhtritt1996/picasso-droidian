@@ -1,0 +1,9 @@
+[org.gnome.settings-daemon.plugins.media-keys]
+power=@as []
+power-static=@as []
+
+[org.gnome.desktop.lockdown]
+disable-lock-screen=false
+
+[org.gnome.desktop.screensaver]
+lock-enabled=true
