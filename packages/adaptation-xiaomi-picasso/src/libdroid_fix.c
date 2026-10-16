@@ -103,20 +103,6 @@ typedef struct wl_proxy *(*pfn_marshal_array_flags)(
 );
 typedef const char *(*pfn_get_class)(struct wl_proxy *);
 
-static void *g_top_panel_layer_surface = NULL;
-static void *g_top_panel_draggable_surface = NULL;
-static void *g_home_draggable_surface = NULL;
-
-static void log_debug(const char *msg) {
-    if (getenv("DROID_FIX_DEBUG")) {
-        FILE *f = fopen("/tmp/droid_fix.log", "a");
-        if (f) {
-            fprintf(f, "%s\n", msg);
-            fclose(f);
-        }
-    }
-}
-
 struct wl_proxy *wl_proxy_marshal_array_flags(struct wl_proxy *proxy, uint32_t opcode,
                                              const struct wl_interface *interface,
                                              uint32_t version, uint32_t flags,
@@ -137,7 +123,7 @@ struct wl_proxy *wl_proxy_marshal_array_flags(struct wl_proxy *proxy, uint32_t o
 
     const char *cls = (proxy && real_get_class) ? real_get_class(proxy) : NULL;
 
-    /* Intercept requests before execution */
+    /* Intercept requests before execution safely without pointer dereferences */
     if (cls && args) {
         /* zwlr_layer_surface_v1 */
         if (strcmp(cls, "zwlr_layer_surface_v1") == 0) {
@@ -145,20 +131,12 @@ struct wl_proxy *wl_proxy_marshal_array_flags(struct wl_proxy *proxy, uint32_t o
             if (opcode == 0) {
                 if (args[1].u == ORIGINAL_TOP_BAR_HEIGHT) {
                     args[1].u = TARGET_TOP_BAR_HEIGHT;
-                    log_debug("[zwlr_layer_surface_v1] set_size: 32 -> 54");
                 }
             }
             /* opcode 2: set_exclusive_zone(zone) */
             else if (opcode == 2) {
                 if (args[0].i == ORIGINAL_TOP_BAR_HEIGHT) {
                     args[0].i = TARGET_TOP_BAR_HEIGHT;
-                    log_debug("[zwlr_layer_surface_v1] set_exclusive_zone: 32 -> 54");
-                }
-            }
-            /* opcode 7: destroy */
-            else if (opcode == 7) {
-                if ((void *)proxy == g_top_panel_layer_surface) {
-                    g_top_panel_layer_surface = NULL;
                 }
             }
         }
@@ -168,74 +146,29 @@ struct wl_proxy *wl_proxy_marshal_array_flags(struct wl_proxy *proxy, uint32_t o
             if (opcode == 0) {
                 /*
                  * In Phosh top-panel: margin_folded = (-1 * height) + 32.
-                 * When height is say 800, margin_folded is -768.
                  * To make 54px visible instead of 32px:
-                 * margin_folded = (-1 * height) + 54 = -746.
-                 * So we add HEIGHT_DELTA (+22) to margin_folded.
+                 * margin_folded = (-1 * height) + 54.
+                 * Bottom home bar has height 15 (folded margin ~ -height + 15).
+                 * We only adjust top-panel where folded margin is based on 32.
                  */
-                if ((void *)proxy == g_top_panel_draggable_surface ||
-                    ((void *)proxy != g_home_draggable_surface && args[0].i < -30)) {
+                if (args[0].i < -30) {
                     args[0].i += HEIGHT_DELTA;
-                    log_debug("[zphoc_draggable_layer_surface_v1] set_margins: adjusted folded margin by +22");
                 }
             }
             /* opcode 2: set_exclusive(exclusive) */
             else if (opcode == 2) {
                 if (args[0].u == ORIGINAL_TOP_BAR_HEIGHT) {
                     args[0].u = TARGET_TOP_BAR_HEIGHT;
-                    log_debug("[zphoc_draggable_layer_surface_v1] set_exclusive: 32 -> 54");
                 }
             }
             /* opcode 4: set_drag_handle(handle) */
             else if (opcode == 4) {
-                if ((void *)proxy == g_top_panel_draggable_surface) {
-                    if (args[0].u >= HEIGHT_DELTA) {
-                        args[0].u -= HEIGHT_DELTA;
-                    }
-                }
-            }
-            /* opcode 6: destroy */
-            else if (opcode == 6) {
-                if ((void *)proxy == g_top_panel_draggable_surface) {
-                    g_top_panel_draggable_surface = NULL;
-                }
-                if ((void *)proxy == g_home_draggable_surface) {
-                    g_home_draggable_surface = NULL;
+                if (args[0].u >= HEIGHT_DELTA) {
+                    args[0].u -= HEIGHT_DELTA;
                 }
             }
         }
     }
 
-    /* Execute the real Wayland call */
-    struct wl_proxy *ret = real_marshal(proxy, opcode, interface, version, flags, args);
-
-    /* Track objects created by layer shell requests */
-    if (cls && ret) {
-        if (strcmp(cls, "zwlr_layer_shell_v1") == 0 && opcode == 0 && args) {
-            /* get_layer_surface: scope could be at args[3] or args[4] depending on scanner */
-            const char *scope = NULL;
-            if (args[3].s && (strstr(args[3].s, "panel") || strstr(args[3].s, "phosh"))) scope = args[3].s;
-            else if (args[4].s && (strstr(args[4].s, "panel") || strstr(args[4].s, "phosh"))) scope = args[4].s;
-
-            if (scope) {
-                if (strstr(scope, "top-panel")) {
-                    g_top_panel_layer_surface = (void *)ret;
-                    log_debug("[zwlr_layer_shell_v1] tracked top-panel layer surface");
-                } else if (strstr(scope, "home")) {
-                    /* home panel tracked if needed */
-                }
-            }
-        } else if (strcmp(cls, "zphoc_layer_shell_effects_v1") == 0 && opcode == 0 && args) {
-            /* get_draggable_layer_surface: args[0].o or args[1].o is the layer_surface */
-            void *layer_surf = (void *)args[0].o;
-            if (layer_surf == g_top_panel_layer_surface || (args[1].o && (void *)args[1].o == g_top_panel_layer_surface)) {
-                g_top_panel_draggable_surface = (void *)ret;
-                log_debug("[zphoc_layer_shell_effects_v1] tracked top-panel draggable surface");
-            } else {
-                g_home_draggable_surface = (void *)ret;
-            }
-        }
-    }
-
-    return ret;
+    return real_marshal(proxy, opcode, interface, version, flags, args);
 }

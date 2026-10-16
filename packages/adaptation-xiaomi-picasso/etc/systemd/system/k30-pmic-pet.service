@@ -1,14 +1,13 @@
 [Unit]
 Description=Keep PMIC watchdog disabled and petted
 DefaultDependencies=no
-After=sys-kernel-debug.mount
-Before=basic.target sysinit.target
+Before=sysinit.target
 
 [Service]
 Type=simple
 ExecStart=/usr/local/bin/k30-pmic-pet.sh
 Restart=always
-RestartSec=2
+RestartSec=1
 
 [Install]
-WantedBy=sysinit.target multi-user.target
+WantedBy=sysinit.target

@@ -82,8 +82,16 @@ phosh-top-panel-bg {
 
 #top-bar {
   min-height: 54px;
-  padding-top: 11px;
-  padding-bottom: 11px;
+}
+
+#top-bar > widget,
+#top-bar > label,
+#top-bar > box,
+#box_network,
+#lbl_clock,
+#box_indicators {
+  margin-top: 15px;
+  margin-bottom: 7px;
 }
 
 #box_network {
