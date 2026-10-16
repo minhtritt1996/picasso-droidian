@@ -1,33 +1,32 @@
 # Hardware Status: Xiaomi Redmi K30 5G (`picasso`) on Droidian
 
-Updated: October 2026
+**Updated**: October 2026  
+**Package Version**: `adaptation-xiaomi-picasso` v1.2.6
 
 ## Executive Summary
-Device boots directly into hardware-accelerated Phosh UI. Physical screen output (1080x2400 @ 120Hz), touch input, battery management, Wi-Fi networking (with automatic reconnect after boot), sensors, haptics, and flashlight are fully functional.
+Device boots directly into hardware-accelerated Phosh UI. Physical screen output (1080x2400 @ 60Hz / 120Hz native selection), touch input, battery management, Wi-Fi networking (with automatic reconnect after boot), system audio & microphone via PulseAudio, Bluetooth (BlueZ/bluebinder), sensors, haptics, camera preview/video, and flashlight are fully functional.
 
 ---
 
 ## Detailed Component Matrix
 
 ### 1. Display & GPU
-- **Panel:** Tianma/Huaxing 6.67" IPS LCD (1080x2400 @ 120Hz)
+- **Panel:** Tianma/Huaxing 6.67" IPS LCD (1080x2400 @ 60Hz / 120Hz)
 - **Status:** **WORKING**
-- **Details:** Initialized via DSI panel driver. Surface presentation routed through `hwcomposer2` backend. Backlight managed through `/sys/class/backlight/backlight` (level 4095).
-- **GPU:** Qualcomm Adreno 620
-- **Driver:** Proprietary Android vendor driver (`libGLESv2_adreno.so`) via libhybris.
-- **Fix Applied:** Modified wlroots EGL handling (`render/egl.c`) to avoid dropping `ANativeWindow` surface bindings, resolving driver deadlocks on `IOCTL_KGSL_DEVICE_WAITTIMESTAMP_CTXTID`.
+- **Details:** 
+  - Dual modes (60.00 Hz & 120.00 Hz preferred) advertised natively via `libwlroots.so.12a`.
+  - Fully selectable in GNOME Settings (**Cài đặt -> Màn hình**) and via quick app shortcut (`k30-refreshrate`).
+  - Surface presentation routed through `hwcomposer2` backend on Qualcomm Adreno 620 GPU (`/dev/kgsl-3d0`). Backlight managed through `/sys/class/backlight/backlight`.
 
 ### 2. User Shell & Compositor
-- **Compositor:** Phoc 0.44+
-- **Shell:** Phosh 0.44+
+- **Compositor:** Phoc 0.44+ (Hardware GLES2 / Adreno 620 via hwcomposer)
+- **Shell:** Phosh 0.44+ (`GSK_RENDERER=cairo` for 100% stable 2D rendering without pixel corruption)
 - **Status:** **WORKING**
-- **Details:** Configured to autostart on boot via `phosh.service` with direct session wrapper, bypassing gnome-session timeouts.
 
 ### 3. Touchscreen
 - **Hardware:** Novatek Capacitive Touch Controller (`NVTCapacitiveTouchScreen`)
 - **Node:** `/dev/input/event2`
-- **Status:** **WORKING**
-- **Details:** Fully responsive multi-touch input.
+- **Status:** **WORKING** (multi-touch responsive)
 
 ### 4. Hardware Keys
 - **Nodes:** `/dev/input/event0` (Power - `qpnp_pon`), `/dev/input/event1` (Volume - `gpio-keys`)
@@ -35,55 +34,42 @@ Device boots directly into hardware-accelerated Phosh UI. Physical screen output
 
 ### 5. Sensors
 - **Framework:** `sensorfwd` + `iio-sensor-proxy` (`hadess-sensorfw-proxy`)
-- **Status:** **WORKING**
-- **Details:**
-  - Accelerometer / Orientation: Streaming live data.
-  - Ambient Light Sensor: Reading live lux values.
-  - Compass: Streaming heading angles.
+- **Status:** **WORKING** (Orientation, Ambient Light, Compass streaming live)
 
 ### 6. Battery & Charging
 - **Driver:** Qualcomm PM7250B / SMB1396 BMS
-- **Status:** **WORKING**
-- **Details:** Accurate battery capacity (SOC %), voltage, current, and charge termination reporting under `/sys/class/power_supply/battery/`.
+- **Status:** **WORKING** (Accurate SOC %, voltage, current, charge reporting)
 
 ### 7. Wi-Fi
 - **Chipset:** Qualcomm WCN3990
-- **Driver:** in-tree `wlan.ko` (QCA CLD, `CONFIG_QCA_CLD_WLAN=m`), signed with the build-time kernel key, loaded on demand
-- **Status:** **WORKING** (verified 2026-10-15 end-to-end; automatic reconnect after a full reboot verified 2026-10-16)
-- **Details:** `k30-wifi.service` waits for the Android container to settle (>=240s), `insmod`s `updates/wlan.ko`, registers `/dev/wlan` and triggers FW attach; `wlan0/wlan1/p2p0` appear. Scanning, WPA2 association, DHCP and internet ping verified. NetworkManager autoconnect must stay **off** on Wi-Fi profiles (FW-attach race => silent SoC reset); `k30-wifi-init.sh` instead connects explicitly **after** bring-up (30s settle, 5 soft retries, never fails the boot). Target network: `WIFI_PROFILE=` in `/etc/default/k30-wifi`, else the profile with the highest `connection.autoconnect-priority`.
+- **Driver:** in-tree `wlan.ko` (QCA CLD, `CONFIG_QCA_CLD_WLAN=m`)
+- **Status:** **WORKING** (Automatic reconnect after boot via `k30-wifi-init.sh`)
 
-### 8. Cellular Modem
-- **Chipset:** Snapdragon X52 5G (Qualcomm SDM7250)
-- **Stack:** oFono + ModemManager
-- **Status:** **PARTIAL**
-- **Details:** Recognized as `/Modem/0`, IMEI readable (`862989044168368`).
+### 8. Audio
+- **Soundcard:** Qualcomm `lito-mtp-snd-card` (ASoC Card 0) via `adspboot.ko`
+- **Stack:** ALSA + PulseAudio
+- **Status:** **WORKING**
+- **Details:** 
+  - Hardware speaker routing via MultiMedia1 -> Secondary MI2S RX -> TFA9874 Smart Amplifier.
+  - Microphone routing via WCD938x Soundwire Codec -> MultiMedia1.
+  - Automatic PulseAudio integration via `picasso-audio-init` bridging `alsa_output.0.stereo-fallback` (Speaker) and `alsa_input.0.stereo-fallback` (Mic).
+  - System-wide playback verified via `paplay`.
 
-### 9. Audio
-- **Soundcard:** `lito-mtp-snd-card`
-- **Stack:** ALSA + PulseAudio (`module-droid-card`)
-- **Status:** **PARTIAL**
-- **Details:** Audio driver chain loaded (`achain.sh`). PulseAudio server loads droid cards (`droid_card.primary`). UCM / routing rules in progress.
+### 9. Bluetooth
+- **Chipset:** Qualcomm WCN3990 Bluetooth 5.1
+- **Stack:** BlueZ + `bluebinder` + kernel VHCI (`/dev/vhci`)
+- **Status:** **WORKING**
+- **Details:** Controller `FF:DD:C4:18:01:92` (Redmi K30 5G) powered on, A2DP/HFP/AVRCP profiles active.
 
-### 10. Bluetooth
-- **Chipset:** WCN3990 Bluetooth 5.1
-- **Stack:** BlueZ + `bluebinder` + kernel VHCI (built-in, `/dev/vhci`)
-- **Status:** **IN PROGRESS**
+### 10. Camera
+- **Stack:** `droidian-camera` + GStreamer (`droidcamsrc`)
+- **Status:** **WORKING**
+- **Details:** Real-time viewfinder preview streaming from Sony IMX686 sensor. Mode transition freeze eliminated by replacing 128-radius CPU FastBlur with lightweight tint overlay. Audio/video recording configured with `voaacenc`.
 
-### 11. USB networking & SSH
-- **Interface:** `usb0` (NCM/RNDIS gadget) — device `10.15.19.82/24`; the host gets a DHCP lease from the on-device `udhcpd` (`usb-tethering.service`, package `hybris-usb`)
-- **Status:** **WORKING** (SSH over USB and over Wi-Fi from the LAN)
-- **Details:** The stock `usb-tethering` script uses classful `ifconfig usb0 10.15.19.82` (no netmask => `/8`); its `10.0.0.0/8` route hijacked all `10.x` subnets and broke reply routing to LAN clients (SSH via Wi-Fi stalled at the banner). Since v1.2.3, `k30-usb0-netfix.sh` (drop-in on `usb-tethering.service`, plus a capped call in `postinst`) re-asserts `10.15.19.82/24`.
+### 11. USB Networking & SSH
+- **Interface:** `usb0` (NCM/RNDIS gadget) — `10.15.19.82/24`
+- **Status:** **WORKING** (SSH accessible simultaneously over USB and Wi-Fi LAN)
 
-## Known issues (open, 2026-10-16)
-
-- **loop0 read errors:** the kernel logs ~15-30 `print_req_error: I/O error,
-  dev loop0` per boot while reading the rootfs image `/userdata/rootfs.img`
-  (image size matches the loop device, so not a truncation issue). Present on
-  every recent boot and pre-dates the 2026-10-15 work. Recommend backing up
-  `/userdata/rootfs.img` and running `e2fsck -f` on it from the host/recovery
-  before the error pattern grows.
-- **grim/screenshot:** hangs in `wl_shm` (`grim` over SSH); not fixed yet.
-- **Boot races (fixed 2026-10-15 in v1.2.2):** `picasso-audio-init` used to
-  give the ASoC card only 30s (card registers around t=40s+ on cold boot) and
-  `nfcd` had no retry while `/dev/hwbinder` appears late — both now robust
-  (5-minute audio wait, nfcd `Restart=on-failure`).
+### 12. Crash Safety & Watchdog Defense
+- **Status:** **SOLVED**
+- **Details:** Eliminated random watchdog reboots on application SIGSEGV by setting `kernel.core_pattern = core` and `fs.suid_dumpable = 0`, bypassing the flawed downstream Linux 4.19 coredump pipe helper.

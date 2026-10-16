@@ -1,3 +1,16 @@
 #!/bin/sh
-# Bỏ qua tất cả args (kể cả --session=phosh do phosh-session truyền vào)
-exec /usr/libexec/phosh
+unset EGL_PLATFORM
+unset WLR_BACKENDS
+unset WLR_RENDERER
+export GSK_RENDERER=cairo
+export XDG_CURRENT_DESKTOP=Phosh:GNOME
+
+# Import Wayland environment into systemd --user and D-Bus
+systemctl --user import-environment WAYLAND_DISPLAY XDG_CURRENT_DESKTOP GSK_RENDERER
+dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP GSK_RENDERER 2>/dev/null || true
+
+# Restart portal services so they pick up WAYLAND_DISPLAY immediately
+systemctl --user restart xdg-desktop-portal-gtk 2>/dev/null || true
+systemctl --user restart xdg-desktop-portal 2>/dev/null || true
+
+exec /usr/libexec/phosh -U

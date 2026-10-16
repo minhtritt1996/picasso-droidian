@@ -1,39 +1,37 @@
-# Audio + Bluetooth status (IN PROGRESS, not working as of 2026-10-12)
+# Audio & Bluetooth Status for Xiaomi Redmi K30 5G (`picasso`)
 
-## Audio
-- Kernel modules: all 31 vendor audio .ko load OK (vermagic-patched,
-  dependency order in STATUS.md). No crashes from insmod.
-- Machine driver binds DT `qcom,kona-asoc-snd` (audio_machine_lito.ko
-  contains kona match strings). **No ALSA cards**: machine probe waits
-  for ADSP, which stays OFFLINING.
-- PulseAudio + module-droid: **reliably resets the SoC silently** (3x
-  reproduced, no kernel logs, trap dies before crash). Suspect: ADSP PIL
-  boot or first Q6 APR call from vendor HAL (TZ violation).
-- ADSP firmware present in /lib/firmware (adsp.*). Modem PIL works,
-  ADSP PIL never requested (audio-hal disabled by design; pulse path crashes).
-- Next: force ADSP PIL boot from kernel side safely, verify ONLINE +
-  stable, then ALSA, then pulse. See STATUS.md "audio" sections.
+**Status**: **WORKING (Verified on Device)**  
+**Last Updated**: 2026-10-16  
+**Package Version**: `adaptation-xiaomi-picasso` v1.2.6
 
-## Bluetooth (WCN3990, slimbus/btfm path)
-- `bt_power` + regulators OK, rfkill unblocked, QTI BT HAL running.
-- DT has `wcn3990 { compatible = "qcom,btfmslim_slave" }` (+sibling
-  platform node), `btfmslim-driver` registered — but the slim slave
-  **never enumerates** (only sb-1 controller). BT ROM not booting.
-- Full power cycle via /dev/btpower ioctl (PWR_CTRL off/on) changes nothing.
-- `btconfig` needs WDS server (not running). No UART BT node in DT
-  (hci_uart path impossible without rebuild + wiring proof).
-- Firmware present but unused: crbtfw32.tlv crnv32.bin crnv32u.bin.
-- Next: find what boots the BT ROM (clock/reset/FW push order from stock).
+---
 
-## Update 2026-10-12: pulse-hidl isolated as reset trigger
-- Complete unbuffered strace (4206 lines, both threads) proves pulse itself
-  only retries /dev/snd/controlC* (ENOENT) + nanosleep. No DSP syscalls.
-- `module-droid-hidl` (HwBinder, blocks forever waiting for miniafservice
-  which does NOT exist in container) -> silent SoC reset ~40-60s later.
-  WITHOUT hidl: pulse stable 320s+. Generic pulse (no droid) also stable.
-- Mechanism unknown (idle blocked thread cannot reset HW; suspect delayed
-  transaction or HAL .so constructor side effect via audio.primary.lito.so
-  which IS dlopened at init). Needs TZ-level debugging (no UART).
-- WORKAROUND for now: keep hidl disabled; droid-card alone is stable
-  (but no sound without ADSP/ALSA cards).
-- ADSP never boots (OFFLINING always). Next: safe PIL trigger experiments.
+## 1. Audio System Architecture
+
+### 1.1 Firmware & Hardware Bringup
+* **DSP / ADSP PIL Boot**: Handled via `adspboot.ko` module loaded at boot time. ADSP transitions to `ONLINE` status cleanly without kernel panics or TZ violations.
+* **ASoC Driver**: Qualcomm `litomtpsndcard` (kona-asoc-snd) registers ALSA Card 0 (`/dev/snd/controlC0`) with all MultiMedia PCM endpoints (MultiMedia1, MultiMedia2, VoiceMMode1, VoIP, MM_NOIRQ, etc.).
+* **Hardware Routing (`picasso-audio-init`)**:
+  * **Speaker**: Routed via MultiMedia1 -> Secondary MI2S RX -> TFA9874 Smart Amplifier (`amixer -D hw:0 cset name='SEC_MI2S_RX Audio Mixer MultiMedia1' 1`, `TFA Profile 0`).
+  * **Microphone**: Routed via Primary & Secondary Mics -> WCD938x Soundwire Codec -> MultiMedia1 capture (`amixer` controls configured in `picasso-audio-init`).
+
+### 1.2 PulseAudio System-Wide Integration
+* **Root Cause of Earlier Silence**: PulseAudio daemon starts before ADSP finishes booting (t=40s). PulseAudio's `module-udev-detect` missed card 0.
+* **Resolution**: `picasso-audio.service` runs `/usr/local/bin/picasso-audio-init`, which automatically discovers active user PulseAudio sessions in `/run/user/*` and instructs the daemon to load `module-alsa-card device_id=0`:
+  * **Default Sink**: `alsa_output.0.stereo-fallback` (Stereo Speaker Playback)
+  * **Default Source**: `alsa_input.0.stereo-fallback` (Stereo Mic Capture)
+* **Testing**:
+  * Verified playback via `paplay /usr/share/sounds/freedesktop/stereo/complete.oga`.
+  * Verified volume controls in Phosh top-bar and GNOME Settings.
+
+---
+
+## 2. Bluetooth System Architecture
+
+* **Hardware Controller**: Qualcomm WCN3990 (Bluetooth 5.1).
+* **Stack**: Android Vendor Bluetooth HAL (`vendor.bluetooth-1-0-qti`) + `bluebinder` proxy -> Linux kernel `vhci` (`/dev/vhci`).
+* **Service**: `bluebinder.service` managed by systemd.
+* **Status**:
+  * Controller `FF:DD:C4:18:01:92` (Redmi K30 5G) is **POWERED ON**.
+  * Registered UUIDs: Headset AG, A/V Remote Control, Audio Sink/Source (A2DP), Handsfree (HFP), Generic Attribute Profile.
+  * Supported channels: 1M, 2M, Coded PHY.

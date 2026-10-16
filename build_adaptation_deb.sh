@@ -18,7 +18,7 @@ fi
 find "$PKG_DIR" -type d -exec chmod 755 {} +
 find "$PKG_DIR" -type f -exec chmod 644 {} +
 chmod 755 "$PKG_DIR/DEBIAN/postinst"
-find "$PKG_DIR/usr/local/bin" -type f -exec chmod 755 {} +
+find "$PKG_DIR/usr/local/bin" "$PKG_DIR/usr/bin" -type f -exec chmod 755 {} + 2>/dev/null || true
 
 VERSION=$(grep '^Version:' "$PKG_DIR/DEBIAN/control" | awk '{print $2}')
 [ -n "$VERSION" ] || VERSION="1.1.0"

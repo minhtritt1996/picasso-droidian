@@ -34,6 +34,7 @@ test_*.c
 # Scratch & temporary development folders
 scratch/
 scratch_wlroots/
+scratch_camera/
 adspboot/
 popstub*/
 q6up/

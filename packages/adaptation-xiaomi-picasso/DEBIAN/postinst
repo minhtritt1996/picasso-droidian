@@ -11,6 +11,7 @@ depmod -a 2>/dev/null || true
 
 # Set permissions
 chmod +x /usr/local/bin/* 2>/dev/null || true
+[ -f /usr/bin/droidian-camera.bin ] && chmod 755 /usr/bin/droidian-camera.bin || true
 
 # Android init refuses to parse group/other-writable vendor rc files
 # ("Skipping insecure file"), so keep them strictly 644 root:root.
@@ -43,7 +44,7 @@ fi
 # Disable kernel coredump safely to prevent translation fault oops
 mkdir -p /etc/sysctl.d
 cat << 'EOF' > /etc/sysctl.d/99-disable-coredump.conf
-kernel.core_pattern = |/bin/false
+kernel.core_pattern = core
 fs.suid_dumpable = 0
 EOF
 sysctl -p /etc/sysctl.d/99-disable-coredump.conf 2>/dev/null || true
