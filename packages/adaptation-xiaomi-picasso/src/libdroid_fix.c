@@ -24,7 +24,14 @@ typedef enum _DroidLedsKind {
     DROID_LEDS_KIND_NOTIFICATION,
 } DroidLedsKind;
 
+typedef size_t GType;
+
 DroidLeds *droid_leds_new(void **error) {
+    GType (*pfn_g_object_get_type)(void) = (GType (*)(void))dlsym(RTLD_DEFAULT, "g_object_get_type");
+    void *(*pfn_g_object_new)(GType, const char *, ...) = (void *(*)(GType, const char *, ...))dlsym(RTLD_DEFAULT, "g_object_new");
+    if (pfn_g_object_get_type && pfn_g_object_new) {
+        return (DroidLeds *)pfn_g_object_new(pfn_g_object_get_type(), NULL);
+    }
     static int dummy = 1;
     return (DroidLeds *)&dummy;
 }

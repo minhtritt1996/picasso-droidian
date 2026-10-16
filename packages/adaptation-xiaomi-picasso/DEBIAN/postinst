@@ -108,6 +108,12 @@ EOF
     fi
 done
 
+# Configure PulseAudio droid-card with correct Android audio policy XML
+if [ -f /etc/pulse/arm_droid_card_custom.pa ]; then
+    mv /etc/pulse/arm_droid_card_custom.pa /etc/pulse/arm_droid_card_custom.pa.bak || true
+fi
+sed -i 's|load-module module-droid-card.*|load-module module-droid-card config=/etc/pulse/audio_policy_configuration.xml rate=48000 voice_virtual_stream=true|' /etc/pulse/default.pa 2>/dev/null || true
+
 # Mask conflict / problematic services
 systemctl mask droidian-fpd.service picasso-wifi.service mobile-power-saver.service 2>/dev/null || true
 
@@ -118,6 +124,14 @@ timeout 10 /usr/local/bin/k30-usb0-netfix.sh 2>/dev/null || true
 
 # Apply display anti-flicker and 120Hz lock immediately
 /usr/local/bin/k30-display-power.sh 2>/dev/null || true
+
+# Fix gnome-control-center sound panel template bug (missing id="headphone_group")
+if [ -f /usr/lib/droidian/device/cc_sound_fixed.gresource ] && [ -x /usr/bin/gnome-control-center ]; then
+    if ! strings /usr/bin/gnome-control-center | grep -q 'id="headphone_group"'; then
+        cp -a /usr/bin/gnome-control-center /usr/bin/gnome-control-center.orig 2>/dev/null || true
+        objcopy --update-section .gresource.cc_sound=/usr/lib/droidian/device/cc_sound_fixed.gresource /usr/bin/gnome-control-center 2>/dev/null || true
+    fi
+fi
 
 echo "=== adaptation-xiaomi-picasso installed successfully ==="
 exit 0
