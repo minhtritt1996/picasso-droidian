@@ -3,7 +3,7 @@
 Updated: October 2026
 
 ## Executive Summary
-Device boots directly into hardware-accelerated Phosh UI. Physical screen output (1080x2400 @ 120Hz), touch input, battery management, Wi-Fi networking, sensors, haptics, and flashlight are fully functional.
+Device boots directly into hardware-accelerated Phosh UI. Physical screen output (1080x2400 @ 120Hz), touch input, battery management, Wi-Fi networking (with automatic reconnect after boot), sensors, haptics, and flashlight are fully functional.
 
 ---
 
@@ -49,8 +49,8 @@ Device boots directly into hardware-accelerated Phosh UI. Physical screen output
 ### 7. Wi-Fi
 - **Chipset:** Qualcomm WCN3990
 - **Driver:** in-tree `wlan.ko` (QCA CLD, `CONFIG_QCA_CLD_WLAN=m`), signed with the build-time kernel key, loaded on demand
-- **Status:** **WORKING** (verified 2026-10-15 end-to-end including full device reboot; stale unsigned-module regression fixed)
-- **Details:** `k30-wifi.service` waits for the Android container to settle (>=240s), `insmod`s `updates/wlan.ko`, registers `/dev/wlan` and triggers FW attach; `wlan0/wlan1/p2p0` appear. Scanning, WPA2 association, DHCP and internet ping verified. NetworkManager autoconnect must stay **off** on Wi-Fi profiles (FW-attach race => silent SoC reset).
+- **Status:** **WORKING** (verified 2026-10-15 end-to-end; automatic reconnect after a full reboot verified 2026-10-16)
+- **Details:** `k30-wifi.service` waits for the Android container to settle (>=240s), `insmod`s `updates/wlan.ko`, registers `/dev/wlan` and triggers FW attach; `wlan0/wlan1/p2p0` appear. Scanning, WPA2 association, DHCP and internet ping verified. NetworkManager autoconnect must stay **off** on Wi-Fi profiles (FW-attach race => silent SoC reset); `k30-wifi-init.sh` instead connects explicitly **after** bring-up (30s settle, 5 soft retries, never fails the boot). Target network: `WIFI_PROFILE=` in `/etc/default/k30-wifi`, else the profile with the highest `connection.autoconnect-priority`.
 
 ### 8. Cellular Modem
 - **Chipset:** Snapdragon X52 5G (Qualcomm SDM7250)
@@ -69,7 +69,12 @@ Device boots directly into hardware-accelerated Phosh UI. Physical screen output
 - **Stack:** BlueZ + `bluebinder` + kernel VHCI (built-in, `/dev/vhci`)
 - **Status:** **IN PROGRESS**
 
-## Known issues (open, 2026-10-15)
+### 11. USB networking & SSH
+- **Interface:** `usb0` (NCM/RNDIS gadget) — device `10.15.19.82/24`; the host gets a DHCP lease from the on-device `udhcpd` (`usb-tethering.service`, package `hybris-usb`)
+- **Status:** **WORKING** (SSH over USB and over Wi-Fi from the LAN)
+- **Details:** The stock `usb-tethering` script uses classful `ifconfig usb0 10.15.19.82` (no netmask => `/8`); its `10.0.0.0/8` route hijacked all `10.x` subnets and broke reply routing to LAN clients (SSH via Wi-Fi stalled at the banner). Since v1.2.3, `k30-usb0-netfix.sh` (drop-in on `usb-tethering.service`, plus a capped call in `postinst`) re-asserts `10.15.19.82/24`.
+
+## Known issues (open, 2026-10-16)
 
 - **loop0 read errors:** the kernel logs ~15-30 `print_req_error: I/O error,
   dev loop0` per boot while reading the rootfs image `/userdata/rootfs.img`

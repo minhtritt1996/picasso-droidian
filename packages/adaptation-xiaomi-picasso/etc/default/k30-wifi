@@ -1,0 +1,9 @@
+# Configuration for k30-wifi-init (adaptive auto-connect at boot).
+#
+# If WIFI_PROFILE is unset, the NetworkManager Wi-Fi profile with the
+# highest connection.autoconnect-priority is used (ties: first profile).
+#
+# To pin the network that should be auto-connected, set the exact name of
+# the NetworkManager connection ("nmcli connection show"), for example:
+#
+#WIFI_PROFILE=MyHomeWiFi

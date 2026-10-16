@@ -57,5 +57,10 @@ systemctl enable k30-powerkey.service k30-wifi.service bluebinder.service k30-pm
 # Mask conflict / problematic services
 systemctl mask droidian-fpd.service picasso-wifi.service mobile-power-saver.service 2>/dev/null || true
 
+# Fix usb0 netmask (/8 -> /24) on the running system; at boot it is
+# re-asserted by the usb-tethering.service drop-in. Capped (10s) so a
+# missing usb0 never stalls dpkg; the script itself always exits 0.
+timeout 10 /usr/local/bin/k30-usb0-netfix.sh 2>/dev/null || true
+
 echo "=== adaptation-xiaomi-picasso installed successfully ==="
 exit 0
