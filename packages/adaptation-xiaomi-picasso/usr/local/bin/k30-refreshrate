@@ -6,12 +6,20 @@ XDG_RUNTIME="/run/user/32011"
 WAYLAND_DISP="wayland-0"
 
 get_current_hz() {
-    su - "$TARGET_USER" -c "WAYLAND_DISPLAY=$WAYLAND_DISP XDG_RUNTIME_DIR=$XDG_RUNTIME wlr-randr" 2>/dev/null | grep -oE "[0-9]+\.[0-9]+ Hz \(current\)" | awk '{print int($1)}'
+    su - "$TARGET_USER" -c "WAYLAND_DISPLAY=$WAYLAND_DISP XDG_RUNTIME_DIR=$XDG_RUNTIME wlr-randr" 2>/dev/null | grep "current" | grep -oE "[0-9]+\.[0-9]+ Hz" | awk '{print int($1)}'
 }
 
 set_hz() {
     local hz="$1"
     su - "$TARGET_USER" -c "WAYLAND_DISPLAY=$WAYLAND_DISP XDG_RUNTIME_DIR=$XDG_RUNTIME wlr-randr --output HWCOMPOSER-1 --mode 1080x2400@${hz}Hz"
+    DISP_PARAM="/sys/devices/platform/soc/ae00000.qcom,mdss_mdp/drm/card0/card0-DSI-1/disp_param"
+    if [ -e "$DISP_PARAM" ]; then
+        if [ "$hz" -ge 90 ]; then
+            echo "0x50000000" > "$DISP_PARAM" 2>/dev/null || true
+        else
+            echo "0x30000000" > "$DISP_PARAM" 2>/dev/null || true
+        fi
+    fi
     su - "$TARGET_USER" -c "notify-send -i video-display -a 'Màn hình' 'Tần số quét' 'Đã chuyển sang ${hz}Hz'" 2>/dev/null || true
     echo "Switched display to ${hz}Hz"
 }

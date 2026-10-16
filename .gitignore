@@ -58,3 +58,4 @@ output/
 /k30-wifi.sh
 /k30_present_colors.c
 /libsdm_poll_fix.c
+packages/*.deb

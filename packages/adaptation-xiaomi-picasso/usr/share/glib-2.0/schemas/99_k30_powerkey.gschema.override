@@ -14,4 +14,8 @@ orientation-lock=false
 [org.gnome.system.location]
 enabled=true
 
+[org.gnome.settings-daemon.plugins.power]
+ambient-enabled=false
+
+
 

@@ -43,3 +43,18 @@ echo N > /sys/kernel/debug/dri/0/encoder28/idle_power_collapse 2>/dev/null
 # 8. Disable PMIC charging hardware watchdog (prevent sudden reset / cold boot bite)
 echo '0x1651 0x00' > /sys/kernel/debug/regmap/spmi0-02/registers 2>/dev/null
 echo '0x1643 0x01' > /sys/kernel/debug/regmap/spmi0-02/registers 2>/dev/null
+
+# 9. Lock Xiaomi LCD hardware display parameters to eliminate screen flickering / jitter:
+# - DISPPARAM_IDLE_OFF (0x0B000000): disable panel idle sleep
+# - DISPPARAM_CABC_OFF (0x00000400): disable content-adaptive backlight flickering
+# - DISPPARAM_ACL_OFF  (0x0000F000): disable auto-contrast luminance shifts
+# - DISPPARAM_DFPS_LEVEL5 & Smart DFPS off (0x50000000): lock 120Hz & prevent 50Hz mode flapping
+DISP_PARAM="/sys/devices/platform/soc/ae00000.qcom,mdss_mdp/drm/card0/card0-DSI-1/disp_param"
+if [ -e "$DISP_PARAM" ]; then
+    chmod 0666 "$DISP_PARAM" 2>/dev/null || true
+    echo "0x0B000000" > "$DISP_PARAM" 2>/dev/null || true
+    echo "0x00000400" > "$DISP_PARAM" 2>/dev/null || true
+    echo "0x0000F000" > "$DISP_PARAM" 2>/dev/null || true
+    echo "0x50000000" > "$DISP_PARAM" 2>/dev/null || true
+fi
+

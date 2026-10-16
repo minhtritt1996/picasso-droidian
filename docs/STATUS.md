@@ -1,10 +1,10 @@
 # Hardware Status: Xiaomi Redmi K30 5G (`picasso`) on Droidian
 
 **Updated**: October 2026  
-**Package Version**: `adaptation-xiaomi-picasso` v1.2.7
+**Package Version**: `adaptation-xiaomi-picasso` v1.2.8
 
 ## Executive Summary
-Device boots directly into hardware-accelerated Phosh UI. Physical screen output (1080x2400 @ 60Hz / 120Hz native selection with zero-jitter hardware VSync alignment), touch input, battery management, Wi-Fi networking (with automatic reconnect after boot), system audio & microphone via PulseAudio, Bluetooth (BlueZ/bluebinder), sensors, haptics, camera preview/video, and flashlight are fully functional.
+Device boots directly into hardware-accelerated Phosh UI. Physical screen output (1080x2400 @ 60Hz / 120Hz native selection with zero-jitter hardware VSync alignment, Xiaomi kernel CABC/ACL/Smart DFPS flapping completely eliminated), touch input, battery management, Wi-Fi networking (with automatic reconnect after boot), system audio & microphone via PulseAudio, Bluetooth (BlueZ/bluebinder), sensors, haptics, camera preview/video, and flashlight are fully functional.
 
 ---
 
@@ -17,6 +17,8 @@ Device boots directly into hardware-accelerated Phosh UI. Physical screen output
   - Dual modes (60.00 Hz & 120.00 Hz preferred) advertised natively via `libwlroots.so.12a`.
   - Dynamic hardware config switching via HWC2 `Composer::setActiveConfig` (Config 0 = 120Hz / 8.33ms, Config 2 = 60Hz / 16.66ms).
   - Synchronous `sync_wait` 100ms stall completely eliminated from `present()`; multi-buffering runs asynchronously with zero dropped frames.
+  - Screen flickering & rapid blinking eliminated via Xiaomi hardware `disp_param` lockdown: Smart DFPS 50Hz/120Hz flapping disabled (`0x50000000`), panel idle sleep disabled (`0x0B000000`), CABC dynamic PWM dimming disabled (`0x00000400`), and ACL auto-contrast disabled (`0x0000F000`).
+  - Auto-brightness sensor wobble disabled (`ambient-enabled=false` in GNOME power settings).
   - Fully selectable in GNOME Settings (**Cài đặt -> Màn hình**) and via quick app shortcut (`k30-refreshrate`).
   - Surface presentation routed through `hwcomposer2` backend on Qualcomm Adreno 620 GPU (`/dev/kgsl-3d0`). Backlight managed through `/sys/class/backlight/backlight`.
 

@@ -4,7 +4,7 @@
 [![Device](https://img.shields.io/badge/Device-Xiaomi%20Redmi%20K30%205G-blue)](https://wiki.postmarketos.org/wiki/Xiaomi_Redmi_K30_5G_(xiaomi-picasso))
 [![Kernel](https://img.shields.io/badge/Kernel-4.19.113--lineage--picasso%2B-green)](https://github.com/minhtritt1996/picasso-droidian)
 [![Spec--Kit](https://img.shields.io/badge/Spec--Kit-Enabled-blueviolet)](https://github.com/github/spec-kit)
-[![Release](https://img.shields.io/badge/Adaptation-v1.2.7-success)](https://github.com/minhtritt1996/picasso-droidian/releases/tag/v1.2.7)
+[![Release](https://img.shields.io/badge/Adaptation-v1.2.8-success)](https://github.com/minhtritt1996/picasso-droidian/releases/tag/v1.2.8)
 
 Port of **Droidian GNU/Linux** (Halium 11 base) for the **Xiaomi Redmi K30 5G** (`picasso` / Qualcomm Snapdragon 765G / SM7250 / Adreno 620).
 
@@ -40,16 +40,23 @@ Boots directly into hardware-accelerated **Phosh UI**. Full support for high-ref
 * **Root Cause**: `/etc/sysctl.d/99-disable-coredump.conf` used `kernel.core_pattern = |/bin/false`. On downstream Qualcomm 4.19 kernels, piping coredumps triggers a fatal Translation Fault Kernel Oops in `call_usermodehelper`.
 * **Solution**: Configured `kernel.core_pattern = core` and `fs.suid_dumpable = 0`. With standard `rlimit_core = 0`, the kernel immediately skips coredump processing without invoking helpers or writing files. Crashing processes now exit cleanly with code `139` without rebooting.
 
-### 2. Screen Jitter & Stutter Elimination (Dynamic HWC2 `setActiveConfig` & Zero-Wait Async Pipeline)
-* **Problem**: UI animations stuttered and the display experienced rapid micro-jitter ("nhảy nhảy") and dropped frames.
-* **Root Cause**: 
-  1. Qualcomm HWC booted in Config 2 (60.0 Hz), but wlroots hardcoded its frame scheduler to 120 Hz (8.33ms), causing erratic timer offsets (frame deltas oscillating between 4ms, 8ms, and 16ms).
-  2. `hwcomposer2_present()` synchronously stalled the main compositor thread with `sync_wait(..., 100)` on every frame, serializing the 8-buffer pipeline into a blocking single-buffer loop.
-  3. Release and present fences leaked open file descriptors accumulating in `phoc`.
+### 2. Screen Flickering, Jitter & Stutter Elimination (Dynamic HWC2 `setActiveConfig` & Xiaomi Hardware Display Lockdown)
+* **Problem**: UI animations stuttered, and the screen exhibited rapid flickering / blinking / micro-jitter ("nhảy nhảy màn hình") even when stationary.
+* **Root Causes**:
+  1. **Kernel Smart DFPS Mode Flapping**: In Qualcomm/Xiaomi display driver (`xiaomi_frame_stat.c` & `dsi_panel_mi.c`), proprietary Smart DFPS was enabled by default. Whenever frame interval exceeded 70ms (`skip_count >= 3`), the kernel throttled the panel to 50Hz (`DISPPARAM_DFPS_LEVEL2`), then instantly snapped back to 120Hz the moment a frame arrived. This mode flapping triggered `ALERT: changing window size from 8000000 to 20000000` 3-4 times every second, causing panel clock re-syncing and visible screen blinking.
+  2. **CABC & ACL Backlight Modulation**: Content Adaptive Backlight Control (`DISPPARAM_CABCUI_ON`) and Auto-Contrast Luminance (`DISPPARAM_ACL_L1`) dynamically altered IPS backlight PWM based on frame pixels.
+  3. **Auto-Brightness Sensor Wobble**: GNOME power daemon plugin had `ambient-enabled=true`, oscillating backlight on ambient sensor noise.
+  4. **Sync-Wait & Fence Leaks**: `hwcomposer2_present()` blocked synchronously on `sync_wait` (100ms timeout), and leaked release fences, pushing CPU load to 10.91.
 * **Solution**:
-  1. Hooked dynamic `setActiveConfig` via Android `Composer::setActiveConfig` in `libwlroots.so.12a`. Mode switching dynamically drives the hardware display controller to Config 0 (120 Hz / 8.33ms) or Config 2 (60 Hz / 16.66ms).
-  2. Removed blocking `sync_wait` from `hwcomposer2_present()`. Rendering runs fully asynchronous across 8 buffers.
-  3. Properly drained and closed all fences, completely eliminating fd leaks. Load average dropped from 10.91 to ~1.2.
+  1. **Hardware Display Lockdown**: Locked Xiaomi hardware display parameters via `/sys/devices/platform/soc/ae00000.qcom,mdss_mdp/drm/card0/card0-DSI-1/disp_param`:
+     - `0x0B000000` (`DISPPARAM_IDLE_OFF`): Panel idle sleep disabled.
+     - `0x00000400` (`DISPPARAM_CABC_OFF`): CABC dynamic backlight modulation disabled.
+     - `0x0000F000` (`DISPPARAM_ACL_OFF`): ACL auto-contrast disabled.
+     - `0x50000000` (`DISPPARAM_DFPS_LEVEL5` & Smart DFPS off): Locked 120Hz refresh rate and stopped 50Hz mode flapping permanently.
+  2. **Wlroots Synchronous Hook**: Patched `libwlroots.so.12a` to write to `disp_param` synchronously on mode switches (0x50000000 for 120Hz, 0x30000000 for 60Hz) and initial presentation.
+  3. **Async Pipeline**: Removed blocking `sync_wait`, drained fences, and dropped CPU load average from 10.91 to ~1.0.
+  4. **Auto-Brightness Lockdown**: Set `ambient-enabled=false` in GNOME power settings.
+
 
 ### 3. Native 60Hz & 120Hz Display Refresh Rate in Settings
 * **Problem**: GNOME Control Center (Settings -> Displays) hid the refresh rate selection entirely.

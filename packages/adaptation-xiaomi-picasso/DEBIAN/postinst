@@ -63,5 +63,8 @@ systemctl mask droidian-fpd.service picasso-wifi.service mobile-power-saver.serv
 # missing usb0 never stalls dpkg; the script itself always exits 0.
 timeout 10 /usr/local/bin/k30-usb0-netfix.sh 2>/dev/null || true
 
+# Apply display anti-flicker and 120Hz lock immediately
+/usr/local/bin/k30-display-power.sh 2>/dev/null || true
+
 echo "=== adaptation-xiaomi-picasso installed successfully ==="
 exit 0

@@ -1,3 +1,5 @@
 KERNEL=="ion", MODE="0666"
 KERNEL=="kgsl-3d0", MODE="0666"
 SUBSYSTEM=="kgsl", MODE="0666", ATTR{preemption}="0"
+SUBSYSTEM=="drm", KERNEL=="card0-DSI-1", RUN+="/bin/chmod 0666 /sys/devices/platform/soc/ae00000.qcom,mdss_mdp/drm/card0/card0-DSI-1/disp_param"
+
