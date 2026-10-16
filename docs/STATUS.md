@@ -1,7 +1,7 @@
 # Hardware Status: Xiaomi Redmi K30 5G (`picasso`) on Droidian
 
 **Updated**: October 2026  
-**Package Version**: `adaptation-xiaomi-picasso` v1.3.0
+**Package Version**: `adaptation-xiaomi-picasso` v1.3.1
 
 ## Executive Summary
 Device boots directly into hardware-accelerated Phosh UI. Physical screen output (1080x2400 @ 60Hz / 120Hz native selection with zero-jitter hardware VSync alignment, Xiaomi kernel CABC/ACL/Smart DFPS flapping completely eliminated), touch input, battery management, Wi-Fi networking (with automatic reconnect after boot), system audio & microphone via PulseAudio, Bluetooth (BlueZ/bluebinder), sensors, haptics, camera preview/video, and flashlight are fully functional.

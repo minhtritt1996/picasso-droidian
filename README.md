@@ -4,7 +4,7 @@
 [![Device](https://img.shields.io/badge/Device-Xiaomi%20Redmi%20K30%205G-blue)](https://wiki.postmarketos.org/wiki/Xiaomi_Redmi_K30_5G_(xiaomi-picasso))
 [![Kernel](https://img.shields.io/badge/Kernel-4.19.113--lineage--picasso%2B-green)](https://github.com/minhtritt1996/picasso-droidian)
 [![Spec--Kit](https://img.shields.io/badge/Spec--Kit-Enabled-blueviolet)](https://github.com/github/spec-kit)
-[![Release](https://img.shields.io/badge/Adaptation-v1.3.0-success)](https://github.com/minhtritt1996/picasso-droidian/releases/tag/v1.3.0)
+[![Release](https://img.shields.io/badge/Adaptation-v1.3.1-success)](https://github.com/minhtritt1996/picasso-droidian/releases/tag/v1.3.1)
 
 Port of **Droidian GNU/Linux** (Halium 11 base) for the **Xiaomi Redmi K30 5G** (`picasso` / Qualcomm Snapdragon 765G / SM7250 / Adreno 620).
 
@@ -94,6 +94,13 @@ Boots directly into hardware-accelerated **Phosh UI**. Full support for high-ref
   2. Created custom `/usr/local/lib/libdroid_fix.so` translating `droid_leds` calls directly to kernel `/sys/class/backlight/panel0-backlight/brightness`, giving 100% accurate, smooth backlight slider control.
   3. Configured `flashlightd` sysfs node `/sys/class/leds/flashlight/brightness` and udev permissions (0666), enabling native Quick Settings Torch toggling.
   4. Calls and Chats services now start automatically and respond instantaneously to UI clicks and incoming telephony/SMS events.
+
+### 9. Dual Front Camera Punch-Hole Status Bar Safezone & Kernel Hardening (v1.3.1)
+* **Problem**: The dual front selfie cameras (pill cutout at top-right corner, physical bounds X: 854–1090, Y: 0–95) physically covered the 32px logical (64px physical) status bar, cutting 31px down into full-screen application headers (e.g. Calls tabs "Recent", "Contacts", "Dial Pad"). Moreover, status indicators (battery %, location) sat directly underneath the camera glass.
+* **Solution**:
+  1. **Status Bar Height Expansion (54px logical = 108px physical)**: Intercepted Wayland layer shell surface requests in [`libdroid_fix.so`](packages/adaptation-xiaomi-picasso/usr/local/lib/libdroid_fix.so) (`zwlr_layer_surface_v1_set_size`, `set_exclusive_zone`, and `zphoc_draggable_layer_surface_v1_set_margins` / `set_exclusive`). The status bar exclusive zone now expands cleanly to 54px (108px physical), completely enclosing the 95px camera cutout within the black bar. All app headers now start cleanly at Y=108px with zero obstruction.
+  2. **Indicator Safezone Shift**: Configured GTK CSS `#box_indicators { padding-right: 135px; }`, shifting the battery % and status icons to end at X=845px physical (left of X=854px camera edge), keeping the camera cutout zone 100% black and uncluttered.
+  3. **Kernel Coredump & Watchdog Hardening**: Disabled userspace coredump piping to prevent Qualcomm translation fault oopses (`/etc/sysctl.d/99-disable-coredump.conf`), added missing Qualcomm Venus video firmware (`venus.*`) and Camera ICP firmware (`CAMERA_ICP.elf`), and moved `k30-pmic-pet.service` to early sysinit (`DefaultDependencies=no`, `Before=basic.target sysinit.target`) to eliminate reboot loops and PMIC hardware watchdog pet starvation.
 
 ---
 
