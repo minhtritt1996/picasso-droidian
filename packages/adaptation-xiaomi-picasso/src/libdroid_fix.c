@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <stdarg.h>
 
 /* =========================================================================
  * 1. Xiaomi Redmi K30 5G (picasso) Backlight sysfs mapping for Phosh
@@ -61,7 +62,10 @@ gboolean droid_leds_set_backlight(DroidLeds *self, guint level, gboolean save) {
     if (fd >= 0) {
         char buf[16];
         int len = snprintf(buf, sizeof(buf), "%d\n", val);
-        write(fd, buf, len);
+        if (len > 0) {
+            ssize_t ret = write(fd, buf, (size_t)len);
+            (void)ret;
+        }
         close(fd);
     }
     return 1;
@@ -75,6 +79,7 @@ void droid_leds_clear_notification(DroidLeds *self) {
 
 /* =========================================================================
  * 2. Status Bar Height Expansion (32px -> 54px logical) for Dual Punch-Hole
+ *    Only affects Top Panel; leaves Home Bar (bottom bar) 100% untouched.
  * ========================================================================= */
 #define ORIGINAL_TOP_BAR_HEIGHT 32
 #define TARGET_TOP_BAR_HEIGHT   54
@@ -103,6 +108,9 @@ typedef struct wl_proxy *(*pfn_marshal_array_flags)(
 );
 typedef const char *(*pfn_get_class)(struct wl_proxy *);
 
+static void *g_top_panel_drag_surface = NULL;
+static void *g_home_drag_surface = NULL;
+
 struct wl_proxy *wl_proxy_marshal_array_flags(struct wl_proxy *proxy, uint32_t opcode,
                                              const struct wl_interface *interface,
                                              uint32_t version, uint32_t flags,
@@ -127,13 +135,13 @@ struct wl_proxy *wl_proxy_marshal_array_flags(struct wl_proxy *proxy, uint32_t o
     if (cls && args) {
         /* zwlr_layer_surface_v1 */
         if (strcmp(cls, "zwlr_layer_surface_v1") == 0) {
-            /* opcode 0: set_size(width, height) */
+            /* opcode 0: set_size(width, height) - only for top panel */
             if (opcode == 0) {
                 if (args[1].u == ORIGINAL_TOP_BAR_HEIGHT) {
                     args[1].u = TARGET_TOP_BAR_HEIGHT;
                 }
             }
-            /* opcode 2: set_exclusive_zone(zone) */
+            /* opcode 2: set_exclusive_zone(zone) - only for top panel */
             else if (opcode == 2) {
                 if (args[0].i == ORIGINAL_TOP_BAR_HEIGHT) {
                     args[0].i = TARGET_TOP_BAR_HEIGHT;
@@ -142,29 +150,27 @@ struct wl_proxy *wl_proxy_marshal_array_flags(struct wl_proxy *proxy, uint32_t o
         }
         /* zphoc_draggable_layer_surface_v1 */
         else if (strcmp(cls, "zphoc_draggable_layer_surface_v1") == 0) {
-            /* opcode 0: set_margins(margin_folded, margin_unfolded) */
-            if (opcode == 0) {
-                /*
-                 * In Phosh top-panel: margin_folded = (-1 * height) + 32.
-                 * To make 54px visible instead of 32px:
-                 * margin_folded = (-1 * height) + 54.
-                 * Bottom home bar has height 15 (folded margin ~ -height + 15).
-                 * We only adjust top-panel where folded margin is based on 32.
-                 */
-                if (args[0].i < -30) {
-                    args[0].i += HEIGHT_DELTA;
+            /* opcode 2: set_exclusive(exclusive) */
+            if (opcode == 2) {
+                if (args[0].u == ORIGINAL_TOP_BAR_HEIGHT) {
+                    g_top_panel_drag_surface = (void *)proxy;
+                    args[0].u = TARGET_TOP_BAR_HEIGHT;
+                } else if (args[0].u == 15) {
+                    g_home_drag_surface = (void *)proxy;
                 }
             }
-            /* opcode 2: set_exclusive(exclusive) */
-            else if (opcode == 2) {
-                if (args[0].u == ORIGINAL_TOP_BAR_HEIGHT) {
-                    args[0].u = TARGET_TOP_BAR_HEIGHT;
+            /* opcode 0: set_margins(margin_folded, margin_unfolded) - ONLY adjust top panel! */
+            else if (opcode == 0) {
+                if ((void *)proxy != g_home_drag_surface && (void *)proxy == g_top_panel_drag_surface) {
+                    args[0].i += HEIGHT_DELTA;
                 }
             }
             /* opcode 4: set_drag_handle(handle) */
             else if (opcode == 4) {
-                if (args[0].u >= HEIGHT_DELTA) {
-                    args[0].u -= HEIGHT_DELTA;
+                if ((void *)proxy == g_top_panel_drag_surface) {
+                    if (args[0].u >= HEIGHT_DELTA) {
+                        args[0].u -= HEIGHT_DELTA;
+                    }
                 }
             }
         }
