@@ -1,65 +1,95 @@
-# picasso-droidian — Droidian (Halium 11) for Redmi K30 5G (picasso)
+# picasso-droidian — Droidian (Halium 11) for Xiaomi Redmi K30 5G (`picasso`)
 
-Port of Droidian GNU/Linux (Halium 11 base) for the Xiaomi Redmi K30 5G (`picasso`, Qualcomm Snapdragon 765G / SM7250 / Adreno 620).
+[![Droidian](https://img.shields.io/badge/OS-Droidian%20GNU%2FLinux-orange)](https://droidian.org)
+[![Device](https://img.shields.io/badge/Device-Xiaomi%20Redmi%20K30%205G-blue)](https://wiki.postmarketos.org/wiki/Xiaomi_Redmi_K30_5G_(xiaomi-picasso))
+[![Kernel](https://img.shields.io/badge/Kernel-4.19.113--lineage--picasso%2B-green)](https://github.com/minhtritt1996/picasso-droidian)
+[![Spec--Kit](https://img.shields.io/badge/Spec--Kit-Enabled-blueviolet)](https://github.com/github/spec-kit)
+[![Release](https://img.shields.io/badge/Adaptation-v1.2.6-success)](https://github.com/minhtritt1996/picasso-droidian/releases/tag/v1.2.6)
 
-Boots directly into hardware-accelerated Phosh UI. Full support for physical display (1080x2400@120Hz), Novatek touchscreen, sensors (accelerometer, ambient light, compass), Wi-Fi, battery charging management, and cellular modem.
+Port of **Droidian GNU/Linux** (Halium 11 base) for the **Xiaomi Redmi K30 5G** (`picasso` / Qualcomm Snapdragon 765G / SM7250 / Adreno 620).
+
+Boots directly into hardware-accelerated **Phosh UI**. Full support for high-refresh display (**60Hz / 120Hz** native selection in Settings), Adreno 620 GPU, multi-touch, full sensors, system-wide PulseAudio sound & microphone, Bluetooth 5.1, Wi-Fi 5 (auto-reconnect after boot), camera preview & video, and battery management.
 
 ---
 
-## 📱 Hardware Support Status
+## 📱 Hardware Support Status (October 2026)
 
 | Subsystem | Component / Tech | Status | Notes |
 |---|---|:---:|---|
-| **Boot & Kernel** | Linux 4.19.113 LineageOS, Halium-boot v2 | ✅ **WORKING** | Boots directly to userspace + LXC Android container + SSH (USB RNDIS / Wi-Fi). Module enforcement: MODVERSIONS + signatures (`-lineage-picasso+` releases). |
-| **Display** | 6.67" IPS LCD (1080x2400 @ 120Hz) | ✅ **WORKING** | Panel initialization via DSI. Persistent backlight control (`4095/4095`). |
-| **GPU Acceleration** | Qualcomm Adreno 620 (`libGLESv2_adreno.so`) | ✅ **WORKING** | Hardware accelerated via GLES2/3.2 + HWC2. Wlroots deadlock bug resolved. |
-| **User Interface** | Phoc (Compositor) + Phosh (Shell) | ✅ **WORKING** | Stable execution bypassed gnome-session timeout via direct wrapper. Autostarts on boot. |
-| **Touchscreen** | Novatek Capacitive (`NVTCapacitiveTouchScreen`) | ✅ **WORKING** | Responsive input registered under `/dev/input/event2`. |
+| **Boot & Kernel** | Linux 4.19.113 LineageOS (`-lineage-picasso+`), Halium-boot v2 | ✅ **WORKING** | Clean boot into userspace + LXC Android container + SSH (USB & Wi-Fi). Watchdog reboot bug eliminated. |
+| **Display (60/120Hz)** | 6.67" IPS LCD (1080x2400) | ✅ **WORKING** | Native dual-mode selection (**60.00 Hz / 120.00 Hz**) in **GNOME Settings** and via quick app shortcut (`k30-refreshrate`). |
+| **GPU Acceleration** | Qualcomm Adreno 620 (`libGLESv2_adreno.so`) | ✅ **WORKING** | Hardware accelerated via GLES2/3.2 + HWC2 on `/dev/kgsl-3d0`. OpenGL ES 3.2 available via Wayland. |
+| **User Interface** | Phoc (Compositor) + Phosh (Shell) | ✅ **WORKING** | Phoc runs on GPU; Phosh runs with Cairo 2D for 100% pixel-perfect stability without visual corruption. |
+| **Audio & Mic** | ALSA (`litomtpsndcard`) + PulseAudio | ✅ **WORKING** | ADSP booted via `adspboot.ko`. Automatic PulseAudio bridge (`alsa_output` speaker & `alsa_input` mic). System playback verified. |
+| **Bluetooth** | Qualcomm WCN3990 Bluetooth 5.1 | ✅ **WORKING** | Managed by `bluebinder.service` through kernel `/dev/vhci`. Powered on, A2DP / HFP / AVRCP profiles active. |
+| **Wi-Fi** | Qualcomm WCN3990 (Wi-Fi 5) | ✅ **WORKING** | In-tree signed `wlan.ko`. Automated safe post-boot connection (`k30-wifi-init.sh`) without container race. |
+| **Camera** | Sony IMX686 64MP + Front Sensors | ✅ **WORKING** | `droidian-camera` with `droidcamsrc` hardware ISP pipeline. Fast photo/video mode switching without freezes. |
+| **Touchscreen** | Novatek Capacitive (`NVTCapacitiveTouchScreen`) | ✅ **WORKING** | Smooth multi-touch responsive under `/dev/input/event2`. |
 | **Hardware Keys** | Power & Volume Up/Down (`qpnp_pon`, `gpio-keys`) | ✅ **WORKING** | Registered under `/dev/input/event0` and `/dev/input/event1`. |
-| **Sensors** | Sensorfw + `iio-sensor-proxy` | ✅ **WORKING** | Accelerometer, Ambient Light Sensor, and Compass streaming data in real-time. |
-| **Battery & Charging** | Qualcomm SMB1396 / PM7250B BMS | ✅ **WORKING** | Battery percentage, voltage, and charging thermal regulator fully reported. |
-| **Haptics & Flash** | Vibrator motor + Dual-LED Flash | ✅ **WORKING** | Controllable via `/sys/class/timed_output/vibrator` and `/sys/class/leds/led:torch_*`. |
-| **Wi-Fi** | Qualcomm WCN3990 (Wi-Fi 5) | ✅ **WORKING** | Signed in-tree `wlan.ko`, loaded by `k30-wifi.service` after container settle. Scan + WPA2 + DHCP + internet verified (2026-10-15). Keep NM autoconnect **off** on Wi-Fi profiles. |
+| **Sensors** | Sensorfw + `iio-sensor-proxy` | ✅ **WORKING** | Accelerometer, Ambient Light Sensor, Compass streaming live data. |
+| **Battery & Charging** | Qualcomm SMB1396 / PM7250B BMS | ✅ **WORKING** | Accurate SOC %, voltage, current, and thermal charging control under `/sys/class/power_supply/battery/`. |
+| **Haptics & Torch** | Vibrator + Dual-LED Flash | ✅ **WORKING** | Controlled via `/sys/class/timed_output/vibrator` and `/sys/class/leds/led:torch_*`. |
 | **Cellular Modem** | Snapdragon X52 5G (oFono + ModemManager) | ⚠️ **PARTIAL** | Modem detected (`/Modem/0`), IMEI readable. Power management ready. |
-| **Audio** | ALSA + PulseAudio (`lito-mtp-snd-card`) | ⚠️ **PARTIAL** | Kernel soundcard registered; PulseAudio starts with `droid_card.primary`. |
-| **Bluetooth** | Qualcomm WCN3990 Bluetooth 5.1 | ⚠️ **IN PROGRESS** | BlueZ active, `hci_vhci.ko` loaded, proxying through `bluebinder`. |
-| **Camera** | 64MP Quad Rear + Dual Front | ⚠️ **TODO** | V4L2 device nodes present (`/dev/video*`, `/dev/media*`), requires camera stack integration. |
 
 ---
 
-## 🛠️ Key Technical Fixes
+## 🛠️ Key Technical Fixes & Architecture
 
-### 1. Adreno 620 EGL & HWComposer Deadlock Fix
-- **Problem:** When starting Phoc with GLES2 on Qualcomm Adreno 620, the proprietary driver (`libGLESv2_adreno.so`) crashed with `SIGKILL` (`00800005`) due to `IOCTL_KGSL_DEVICE_WAITTIMESTAMP_CTXTID` (Resource deadlock avoided).
-- **Cause:** Wlroots by default called `eglMakeCurrent(..., EGL_NO_SURFACE, ...)` after every frame and during texture uploads. Unbinding the `ANativeWindow` surface breaks Adreno GSL internal buffer-sync tracking on libhybris.
-- **Solution:** Patched `render/egl.c` to maintain context and native surface binding when running under Android/libhybris. See [patches/wlroots-hwc-adreno/0001-fix-hwcomposer2-adreno-deadlock.patch](patches/wlroots-hwc-adreno/0001-fix-hwcomposer2-adreno-deadlock.patch).
+### 1. Watchdog Bite & Kernel Oops Elimination (SIGSEGV Safety)
+* **Problem**: Application crashes (SIGSEGV) caused immediate kernel panic and watchdog reboot after 5 seconds.
+* **Root Cause**: `/etc/sysctl.d/99-disable-coredump.conf` used `kernel.core_pattern = |/bin/false`. On downstream Qualcomm 4.19 kernels, piping coredumps triggers a fatal Translation Fault Kernel Oops in `call_usermodehelper`.
+* **Solution**: Configured `kernel.core_pattern = core` and `fs.suid_dumpable = 0`. With standard `rlimit_core = 0`, the kernel immediately skips coredump processing without invoking helpers or writing files. Crashing processes now exit cleanly with code `139` without rebooting.
 
-### 2. Phosh Session Auto-start & Stability
-- Created `/usr/local/bin/phosh-wrapper` and systemd drop-in `60-direct-phosh.conf` to avoid `gnome-session` timeout termination.
-- Created `backlight-boot.service` ensuring physical screen backlight turns on at maximum brightness (`4095`) automatically upon boot.
-- Enabled `sensorfwd.service` and `iio-sensor-proxy.service` linking Android Sensors HIDL to Linux desktop environment.
+### 2. Native 60Hz & 120Hz Display Refresh Rate in Settings
+* **Problem**: GNOME Control Center (Settings -> Displays) hid the refresh rate selection entirely.
+* **Root Cause**: `wlr_hwcomposer_add_output` in wlroots only configured a single custom mode, leaving `wlr_output->modes` empty.
+* **Solution**: Patched `libwlroots.so.12a` to register both `1080x2400 @ 60.00 Hz` and `1080x2400 @ 120.00 Hz (preferred)` into `output->modes`, handled dynamic `WLR_OUTPUT_STATE_MODE` in `output_commit`, and removed hardcoded 60Hz overrides in `/etc/phosh/phoc.ini`.
 
----
+### 3. Camera Freeze Elimination on Video Switch
+* **Problem**: Switching `droidian-camera` from Photo to Video mode completely locked up the CPU and froze the app.
+* **Root Cause**: `main-gst.qml` applied `FastBlur` with `radius: 128` across 1080x2400 pixels during mode transition. Because Qt renders via CPU llvmpipe, calculating a 128-radius Gaussian blur across 2.6 million pixels pegged all CPU cores at 100%, starving the Qt event loop.
+* **Solution**: Replaced FastBlur/Glow with a lightweight opacity overlay (`#40000000`), patched `droidian-camera.bin` to load optimized `/etc/c.qml`, and fixed recording pipeline encoders (`voaacenc`).
 
-## 📂 Repository Layout
+### 4. System-Wide PulseAudio Integration
+* **Problem**: PulseAudio had no ALSA sinks after boot; apps were silent.
+* **Root Cause**: PulseAudio daemon starts at t=2s, but the ASoC sound card registers at t=40s after ADSP boots. PulseAudio's `module-udev-detect` missed card 0.
+* **Solution**: Enhanced `picasso-audio-init` to automatically instruct active user PulseAudio sessions to load `module-alsa-card device_id=0`, setting `alsa_output.0.stereo-fallback` (speaker) and `alsa_input.0.stereo-fallback` (mic) as defaults.
 
-- `device/picasso/` — Target device configurations, systemd services, drop-ins, and scripts.
-  - `systemd/60-direct-phosh.conf`: Direct Phosh session drop-in.
-  - `systemd/backlight-boot.service`: Persistent backlight boot service.
-  - `systemd/phosh-wrapper.sh`: Wrapper launcher.
-- `patches/` — Patches for upstream libraries.
-  - `wlroots-hwc-adreno/`: Adreno 620 BufferQueue synchronization fix for wlroots 0.18.
-- `kernel/` — Kernel defconfig, patches, and build scripts.
-- `docs/` — Detailed engineering and bringup documentation.
-  - `docs/10-graphics-and-display-acceleration.md`: Complete graphics acceleration postmortem.
-  - `docs/08-wifi-bringup-tested.md`: Wi-Fi driver bringup procedure.
-  - `docs/09-audio-bt-status.md`: Audio and Bluetooth subsystem notes.
-  - `docs/STATUS.md`: Detailed hardware subsystem matrix.
+### 5. Adreno 620 EGL & HWComposer Deadlock Fix
+* **Problem**: Phoc crashed with `SIGKILL` on Adreno 620 due to `IOCTL_KGSL_DEVICE_WAITTIMESTAMP_CTXTID` (Resource deadlock avoided).
+* **Solution**: Patched wlroots `render/egl.c` to preserve `ANativeWindow` surface bindings under libhybris.
 
 ---
 
-## 🚀 Building & Flashing
+## 📐 Spec-Driven Development (GitHub Spec Kit)
 
+This repository follows the **Spec-Driven Development (SDD)** methodology powered by [GitHub Spec Kit](https://github.com/github/spec-kit) with native **Antigravity** (`agy`) integration:
+
+* **[`.specify/memory/constitution.md`](.specify/memory/constitution.md)**: Project Constitution defining non-negotiable principles for Android HAL boundaries, kernel crash safety, GPU vs Cairo rendering, and Debian packaging standards.
+* **[`specs/`](specs/)**: Executable feature specifications, architectural plans, and task breakdowns:
+  * [`specs/001-camera-optimization/`](specs/001-camera-optimization/spec.md): Camera viewfinder and mode transition spec.
+  * [`specs/002-display-refresh-rate/`](specs/002-display-refresh-rate/spec.md): Native 60Hz/120Hz display modes spec.
+  * [`specs/003-crash-safety-watchdog/`](specs/003-crash-safety-watchdog/spec.md): Watchdog reboot & coredump safety spec.
+  * [`specs/004-system-audio-pulseaudio/`](specs/004-system-audio-pulseaudio/spec.md): PulseAudio automatic bridge spec.
+
+---
+
+## 📦 Building & Packaging
+
+### 1. Build the Hardware Adaptation Debian Package
+All device configurations, services, binaries, and udev rules are packaged into a standalone `.deb`:
+```bash
+./build_adaptation_deb.sh
+# Output: output/adaptation-xiaomi-picasso_1.2.6_arm64.deb
+```
+
+Install on device:
+```bash
+scp output/adaptation-xiaomi-picasso_1.2.6_arm64.deb root@10.15.19.82:/tmp/
+ssh root@10.15.19.82 "dpkg -i /tmp/adaptation-xiaomi-picasso_1.2.6_arm64.deb"
+```
+
+### 2. Build Kernel & Boot Image
 ```bash
 # 1. Build kernel (Image.gz + dtbs + modules tarball)
 ./kernel/build_kernel.sh ~/droidian
@@ -67,10 +97,35 @@ Boots directly into hardware-accelerated Phosh UI. Full support for physical dis
 # 2. Pack boot image
 ./scripts/pack_boot.sh ~/droidian
 
-# 3. Flash to device (via fastboot)
+# 3. Flash to device (Fastboot mode)
 fastboot flash boot output/halium-boot-picasso.img
-
-# 4. Install kernel modules on the device rootfs — REQUIRED after every
-#    kernel build (Wi-Fi/audio modules must match the flashed kernel):
-#    on the device: tar xzf kernel-modules-<release>.tar.gz -C /
 ```
+
+---
+
+## 📂 Repository Layout
+
+```
+├── .specify/             # GitHub Spec Kit configuration, constitution, scripts, templates
+├── .agents/skills/       # Spec Kit skills (speckit-specify, speckit-plan, speckit-tasks, etc.)
+├── specs/                # Feature specifications, plans, and verification tasks
+├── packages/
+│   └── adaptation-xiaomi-picasso/   # Debian adaptation package source tree
+│       ├── DEBIAN/                  # Control, conffiles, and postinst scripts
+│       ├── etc/                     # System configs (phoc.ini, asound.conf, udev, c.qml)
+│       ├── usr/bin/                 # Patched binaries (droidian-camera.bin)
+│       ├── usr/lib/                 # Patched libwlroots.so.12a and vendor overlays
+│       └── usr/local/bin/           # Helper daemons (k30-refreshrate, picasso-audio-init)
+├── docs/                 # Detailed technical logs and status documents
+├── build_adaptation_deb.sh # Automated package builder
+└── README.md
+```
+
+---
+
+## 📜 License & Credits
+
+* **Maintainer**: Minh Tri ([@minhtritt1996](https://github.com/minhtritt1996))
+* Base system: [Droidian GNU/Linux](https://droidian.org)
+* HAL layer: [Halium Project](https://halium.org)
+* Spec Toolkit: [GitHub Spec Kit](https://github.com/github/spec-kit)
