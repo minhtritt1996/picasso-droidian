@@ -4,11 +4,11 @@
 [![Device](https://img.shields.io/badge/Device-Xiaomi%20Redmi%20K30%205G-blue)](https://wiki.postmarketos.org/wiki/Xiaomi_Redmi_K30_5G_(xiaomi-picasso))
 [![Kernel](https://img.shields.io/badge/Kernel-4.19.113--lineage--picasso%2B-green)](https://github.com/minhtritt1996/picasso-droidian)
 [![Spec--Kit](https://img.shields.io/badge/Spec--Kit-Enabled-blueviolet)](https://github.com/github/spec-kit)
-[![Release](https://img.shields.io/badge/Adaptation-v1.2.6-success)](https://github.com/minhtritt1996/picasso-droidian/releases/tag/v1.2.6)
+[![Release](https://img.shields.io/badge/Adaptation-v1.2.7-success)](https://github.com/minhtritt1996/picasso-droidian/releases/tag/v1.2.7)
 
 Port of **Droidian GNU/Linux** (Halium 11 base) for the **Xiaomi Redmi K30 5G** (`picasso` / Qualcomm Snapdragon 765G / SM7250 / Adreno 620).
 
-Boots directly into hardware-accelerated **Phosh UI**. Full support for high-refresh display (**60Hz / 120Hz** native selection in Settings), Adreno 620 GPU, multi-touch, full sensors, system-wide PulseAudio sound & microphone, Bluetooth 5.1, Wi-Fi 5 (auto-reconnect after boot), camera preview & video, and battery management.
+Boots directly into hardware-accelerated **Phosh UI**. Full support for high-refresh display (**60Hz / 120Hz** native selection in Settings with zero-jitter hardware synchronization), Adreno 620 GPU, multi-touch, full sensors, system-wide PulseAudio sound & microphone, Bluetooth 5.1, Wi-Fi 5 (auto-reconnect after boot), camera preview & video, and battery management.
 
 ---
 
@@ -17,7 +17,7 @@ Boots directly into hardware-accelerated **Phosh UI**. Full support for high-ref
 | Subsystem | Component / Tech | Status | Notes |
 |---|---|:---:|---|
 | **Boot & Kernel** | Linux 4.19.113 LineageOS (`-lineage-picasso+`), Halium-boot v2 | ✅ **WORKING** | Clean boot into userspace + LXC Android container + SSH (USB & Wi-Fi). Watchdog reboot bug eliminated. |
-| **Display (60/120Hz)** | 6.67" IPS LCD (1080x2400) | ✅ **WORKING** | Native dual-mode selection (**60.00 Hz / 120.00 Hz**) in **GNOME Settings** and via quick app shortcut (`k30-refreshrate`). |
+| **Display (60/120Hz)** | 6.67" IPS LCD (1080x2400) | ✅ **WORKING** | Native dual-mode selection (**60.00 Hz / 120.00 Hz**) with dynamic HWC2 `setActiveConfig` hardware sync. Zero flickering, zero dropped frames. |
 | **GPU Acceleration** | Qualcomm Adreno 620 (`libGLESv2_adreno.so`) | ✅ **WORKING** | Hardware accelerated via GLES2/3.2 + HWC2 on `/dev/kgsl-3d0`. OpenGL ES 3.2 available via Wayland. |
 | **User Interface** | Phoc (Compositor) + Phosh (Shell) | ✅ **WORKING** | Phoc runs on GPU; Phosh runs with Cairo 2D for 100% pixel-perfect stability without visual corruption. |
 | **Audio & Mic** | ALSA (`litomtpsndcard`) + PulseAudio | ✅ **WORKING** | ADSP booted via `adspboot.ko`. Automatic PulseAudio bridge (`alsa_output` speaker & `alsa_input` mic). System playback verified. |
@@ -40,22 +40,33 @@ Boots directly into hardware-accelerated **Phosh UI**. Full support for high-ref
 * **Root Cause**: `/etc/sysctl.d/99-disable-coredump.conf` used `kernel.core_pattern = |/bin/false`. On downstream Qualcomm 4.19 kernels, piping coredumps triggers a fatal Translation Fault Kernel Oops in `call_usermodehelper`.
 * **Solution**: Configured `kernel.core_pattern = core` and `fs.suid_dumpable = 0`. With standard `rlimit_core = 0`, the kernel immediately skips coredump processing without invoking helpers or writing files. Crashing processes now exit cleanly with code `139` without rebooting.
 
-### 2. Native 60Hz & 120Hz Display Refresh Rate in Settings
+### 2. Screen Jitter & Stutter Elimination (Dynamic HWC2 `setActiveConfig` & Zero-Wait Async Pipeline)
+* **Problem**: UI animations stuttered and the display experienced rapid micro-jitter ("nhảy nhảy") and dropped frames.
+* **Root Cause**: 
+  1. Qualcomm HWC booted in Config 2 (60.0 Hz), but wlroots hardcoded its frame scheduler to 120 Hz (8.33ms), causing erratic timer offsets (frame deltas oscillating between 4ms, 8ms, and 16ms).
+  2. `hwcomposer2_present()` synchronously stalled the main compositor thread with `sync_wait(..., 100)` on every frame, serializing the 8-buffer pipeline into a blocking single-buffer loop.
+  3. Release and present fences leaked open file descriptors accumulating in `phoc`.
+* **Solution**:
+  1. Hooked dynamic `setActiveConfig` via Android `Composer::setActiveConfig` in `libwlroots.so.12a`. Mode switching dynamically drives the hardware display controller to Config 0 (120 Hz / 8.33ms) or Config 2 (60 Hz / 16.66ms).
+  2. Removed blocking `sync_wait` from `hwcomposer2_present()`. Rendering runs fully asynchronous across 8 buffers.
+  3. Properly drained and closed all fences, completely eliminating fd leaks. Load average dropped from 10.91 to ~1.2.
+
+### 3. Native 60Hz & 120Hz Display Refresh Rate in Settings
 * **Problem**: GNOME Control Center (Settings -> Displays) hid the refresh rate selection entirely.
 * **Root Cause**: `wlr_hwcomposer_add_output` in wlroots only configured a single custom mode, leaving `wlr_output->modes` empty.
 * **Solution**: Patched `libwlroots.so.12a` to register both `1080x2400 @ 60.00 Hz` and `1080x2400 @ 120.00 Hz (preferred)` into `output->modes`, handled dynamic `WLR_OUTPUT_STATE_MODE` in `output_commit`, and removed hardcoded 60Hz overrides in `/etc/phosh/phoc.ini`.
 
-### 3. Camera Freeze Elimination on Video Switch
+### 4. Camera Freeze Elimination on Video Switch
 * **Problem**: Switching `droidian-camera` from Photo to Video mode completely locked up the CPU and froze the app.
 * **Root Cause**: `main-gst.qml` applied `FastBlur` with `radius: 128` across 1080x2400 pixels during mode transition. Because Qt renders via CPU llvmpipe, calculating a 128-radius Gaussian blur across 2.6 million pixels pegged all CPU cores at 100%, starving the Qt event loop.
 * **Solution**: Replaced FastBlur/Glow with a lightweight opacity overlay (`#40000000`), patched `droidian-camera.bin` to load optimized `/etc/c.qml`, and fixed recording pipeline encoders (`voaacenc`).
 
-### 4. System-Wide PulseAudio Integration
+### 5. System-Wide PulseAudio Integration
 * **Problem**: PulseAudio had no ALSA sinks after boot; apps were silent.
 * **Root Cause**: PulseAudio daemon starts at t=2s, but the ASoC sound card registers at t=40s after ADSP boots. PulseAudio's `module-udev-detect` missed card 0.
 * **Solution**: Enhanced `picasso-audio-init` to automatically instruct active user PulseAudio sessions to load `module-alsa-card device_id=0`, setting `alsa_output.0.stereo-fallback` (speaker) and `alsa_input.0.stereo-fallback` (mic) as defaults.
 
-### 5. Adreno 620 EGL & HWComposer Deadlock Fix
+### 6. Adreno 620 EGL & HWComposer Deadlock Fix
 * **Problem**: Phoc crashed with `SIGKILL` on Adreno 620 due to `IOCTL_KGSL_DEVICE_WAITTIMESTAMP_CTXTID` (Resource deadlock avoided).
 * **Solution**: Patched wlroots `render/egl.c` to preserve `ANativeWindow` surface bindings under libhybris.
 

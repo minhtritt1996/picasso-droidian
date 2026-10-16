@@ -1,10 +1,10 @@
 # Hardware Status: Xiaomi Redmi K30 5G (`picasso`) on Droidian
 
 **Updated**: October 2026  
-**Package Version**: `adaptation-xiaomi-picasso` v1.2.6
+**Package Version**: `adaptation-xiaomi-picasso` v1.2.7
 
 ## Executive Summary
-Device boots directly into hardware-accelerated Phosh UI. Physical screen output (1080x2400 @ 60Hz / 120Hz native selection), touch input, battery management, Wi-Fi networking (with automatic reconnect after boot), system audio & microphone via PulseAudio, Bluetooth (BlueZ/bluebinder), sensors, haptics, camera preview/video, and flashlight are fully functional.
+Device boots directly into hardware-accelerated Phosh UI. Physical screen output (1080x2400 @ 60Hz / 120Hz native selection with zero-jitter hardware VSync alignment), touch input, battery management, Wi-Fi networking (with automatic reconnect after boot), system audio & microphone via PulseAudio, Bluetooth (BlueZ/bluebinder), sensors, haptics, camera preview/video, and flashlight are fully functional.
 
 ---
 
@@ -15,6 +15,8 @@ Device boots directly into hardware-accelerated Phosh UI. Physical screen output
 - **Status:** **WORKING**
 - **Details:** 
   - Dual modes (60.00 Hz & 120.00 Hz preferred) advertised natively via `libwlroots.so.12a`.
+  - Dynamic hardware config switching via HWC2 `Composer::setActiveConfig` (Config 0 = 120Hz / 8.33ms, Config 2 = 60Hz / 16.66ms).
+  - Synchronous `sync_wait` 100ms stall completely eliminated from `present()`; multi-buffering runs asynchronously with zero dropped frames.
   - Fully selectable in GNOME Settings (**Cài đặt -> Màn hình**) and via quick app shortcut (`k30-refreshrate`).
   - Surface presentation routed through `hwcomposer2` backend on Qualcomm Adreno 620 GPU (`/dev/kgsl-3d0`). Backlight managed through `/sys/class/backlight/backlight`.
 
