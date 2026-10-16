@@ -113,6 +113,7 @@ if [ -f /etc/pulse/arm_droid_card_custom.pa ]; then
     mv /etc/pulse/arm_droid_card_custom.pa /etc/pulse/arm_droid_card_custom.pa.bak || true
 fi
 sed -i 's|load-module module-droid-card.*|load-module module-droid-card config=/etc/pulse/audio_policy_configuration.xml rate=48000 voice_virtual_stream=true|' /etc/pulse/default.pa 2>/dev/null || true
+sed -i 's|load-module module-bluetooth-policy.*|load-module module-bluetooth-policy auto_switch=0 a2dp_source=false ag=false|' /etc/pulse/default.pa 2>/dev/null || true
 
 # Mask conflict / problematic services
 systemctl mask droidian-fpd.service picasso-wifi.service mobile-power-saver.service 2>/dev/null || true
