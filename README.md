@@ -4,7 +4,7 @@
 [![Device](https://img.shields.io/badge/Device-Xiaomi%20Redmi%20K30%205G-blue)](https://wiki.postmarketos.org/wiki/Xiaomi_Redmi_K30_5G_(xiaomi-picasso))
 [![Kernel](https://img.shields.io/badge/Kernel-4.19.113--lineage--picasso%2B-green)](https://github.com/minhtritt1996/picasso-droidian)
 [![Spec--Kit](https://img.shields.io/badge/Spec--Kit-Enabled-blueviolet)](https://github.com/github/spec-kit)
-[![Release](https://img.shields.io/badge/Adaptation-v1.2.8-success)](https://github.com/minhtritt1996/picasso-droidian/releases/tag/v1.2.8)
+[![Release](https://img.shields.io/badge/Adaptation-v1.3.0-success)](https://github.com/minhtritt1996/picasso-droidian/releases/tag/v1.3.0)
 
 Port of **Droidian GNU/Linux** (Halium 11 base) for the **Xiaomi Redmi K30 5G** (`picasso` / Qualcomm Snapdragon 765G / SM7250 / Adreno 620).
 
@@ -76,6 +76,24 @@ Boots directly into hardware-accelerated **Phosh UI**. Full support for high-ref
 ### 6. Adreno 620 EGL & HWComposer Deadlock Fix
 * **Problem**: Phoc crashed with `SIGKILL` on Adreno 620 due to `IOCTL_KGSL_DEVICE_WAITTIMESTAMP_CTXTID` (Resource deadlock avoided).
 * **Solution**: Patched wlroots `render/egl.c` to preserve `ANativeWindow` surface bindings under libhybris.
+
+### 7. Screen Jitter / Position Jumping Elimination (One-Shot VSync & Triple Buffering)
+* **Problem**: When opening Settings (`gnome-control-center`), the list and display jumped/vibrated violently up and down, only stopping while the user physically touched the screen.
+* **Root Causes**:
+  1. `schedule_frame()` in wlroots `backend/hwcomposer/output.c` configured a repeating `timerfd` (`.it_interval = interval_tspec`), generating unthrottled 120 FPS render ticks even when the system was completely idle.
+  2. The buffer queue used 8 buffers (`HWCNativeWindowSetBufferCount(8)`). When Settings resized dynamically to account for the top notch, stale full-screen (2400h) and fitted (2306h) buffers were presented out of order by Qualcomm HWC2.
+* **Solution**:
+  1. Changed `timerfd` to a **one-shot timer** (`.it_interval = {0, 0}`). Phoc now renders strictly on damage, dropping idle CPU from 100% to 0.0%–2.0%.
+  2. Enforced standard **Triple Buffering** (`HWCNativeWindowSetBufferCount(3)`), completely eliminating out-of-order frame jumping.
+
+### 8. Full GNOME Session Daemons, Native Brightness Slider, Torch & Communications
+* **Problem**: Calls (`gnome-calls`) and Chats (`chatty`) failed to launch (`result 'dependency'`); the brightness slider, quick-settings Torch button, and Bluetooth control were inactive.
+* **Root Cause**: Phosh was previously launched standalone (`/usr/libexec/phosh -U`), bypassing `gnome-session`. Consequently, `gnome-session-initialized.target` was never reached, preventing all dependent daemons from starting.
+* **Solution**:
+  1. Integrated `exec gnome-session --session=phosh` into `phosh-wrapper`, properly activating `gnome-session.target`, `gnome-session-initialized.target`, and all GNOME Settings Daemons (`gsd-power`, `gsd-rfkill`, `gsd-media-keys`, `gsd-color`).
+  2. Created custom `/usr/local/lib/libdroid_fix.so` translating `droid_leds` calls directly to kernel `/sys/class/backlight/panel0-backlight/brightness`, giving 100% accurate, smooth backlight slider control.
+  3. Configured `flashlightd` sysfs node `/sys/class/leds/flashlight/brightness` and udev permissions (0666), enabling native Quick Settings Torch toggling.
+  4. Calls and Chats services now start automatically and respond instantaneously to UI clicks and incoming telephony/SMS events.
 
 ---
 

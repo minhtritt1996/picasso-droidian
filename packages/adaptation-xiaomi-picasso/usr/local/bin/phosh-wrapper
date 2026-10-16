@@ -12,5 +12,4 @@ dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP
 # Restart portal services so they pick up WAYLAND_DISPLAY immediately
 systemctl --user restart xdg-desktop-portal-gtk 2>/dev/null || true
 systemctl --user restart xdg-desktop-portal 2>/dev/null || true
-
-exec /usr/libexec/phosh -U
+exec gnome-session --session=phosh
