@@ -1,0 +1,13 @@
+[Unit]
+Description=Initialize Binder nodes for Waydroid
+DefaultDependencies=no
+Before=waydroid-container.service
+After=systemd-udev-settle.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/k30-waydroid-binder-init
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
