@@ -101,9 +101,9 @@ ApplicationWindow {
 
                 var cameraPosition = (i === 1) ? "FrontFace" : "BackFace";
 
+                append({"cameraId": i, "index": i, "position": cameraPosition});
+                console.log("Camera with the id:", i, "added as position", cameraPosition);
                 if (cameraPosition === "BackFace") {
-                    append({"cameraId": i, "index": i, "position": cameraPosition});
-                    console.log("Camera with the id:", i, "added as position", cameraPosition);
                     window.backCameras += 1;
                 }
             }

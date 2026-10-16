@@ -129,11 +129,23 @@ struct wl_proxy *wl_proxy_marshal_array_flags(struct wl_proxy *proxy, uint32_t o
     if (!real_marshal) {
         real_marshal = (pfn_marshal_array_flags)dlsym(RTLD_NEXT, "wl_proxy_marshal_array_flags");
         if (!real_marshal) {
+            void *h = dlopen("libwayland-client.so.0", RTLD_LAZY | RTLD_GLOBAL);
+            if (h) {
+                real_marshal = (pfn_marshal_array_flags)dlsym(h, "wl_proxy_marshal_array_flags");
+            }
+        }
+        if (!real_marshal) {
             return NULL;
         }
     }
     if (!real_get_class) {
         real_get_class = (pfn_get_class)dlsym(RTLD_DEFAULT, "wl_proxy_get_class");
+        if (!real_get_class) {
+            void *h = dlopen("libwayland-client.so.0", RTLD_LAZY | RTLD_GLOBAL);
+            if (h) {
+                real_get_class = (pfn_get_class)dlsym(h, "wl_proxy_get_class");
+            }
+        }
     }
 
     const char *cls = (proxy && real_get_class) ? real_get_class(proxy) : NULL;
