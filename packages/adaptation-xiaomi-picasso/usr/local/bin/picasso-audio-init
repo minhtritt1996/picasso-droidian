@@ -13,30 +13,17 @@ if [ ! -e /dev/snd/controlC0 ]; then
     exit 0
 fi
 
-# 1. Speaker Playback Routing (MultiMedia1 -> SEC_MI2S_RX -> TFA9874)
-amixer -D hw:0 cset name='SEC_MI2S_RX Audio Mixer MultiMedia1' 1 >/dev/null 2>&1 || true
-amixer -D hw:0 cset name='SEC_MI2S_RX_DL_HL Switch' 1 >/dev/null 2>&1 || true
-amixer -D hw:0 cset name='TFA Profile' 0 >/dev/null 2>&1 || true
-
-# Initialize TFA9874 SmartPA registers for 16-bit 32-BCK Qualcomm LPASS Secondary MI2S
-if [ -e /sys/bus/i2c/devices/1-0034/reg ]; then
-    python3 -c '
-try:
-    with open("/sys/bus/i2c/devices/1-0034/reg", "wb") as f_reg, open("/sys/bus/i2c/devices/1-0034/rw", "wb") as f_rw:
-        f_reg.write(bytes([0x20])); f_rw.write((0x0890).to_bytes(2, "big"))
-        f_reg.write(bytes([0x21])); f_rw.write((0xc0f1).to_bytes(2, "big"))
-        f_reg.write(bytes([0x01])); f_rw.write((0x0004).to_bytes(2, "big"))
-        f_reg.write(bytes([0x00])); f_rw.write((0x0018).to_bytes(2, "big"))
-except Exception:
-    pass
-' >/dev/null 2>&1 || true
-fi
+# 1. Speaker Playback Routing (MultiMedia1 & MultiMedia5 -> SEC_MI2S_RX -> TFA9874)
+amixer -c 0 cset name='SEC_MI2S_RX Audio Mixer MultiMedia1' 1,1 >/dev/null 2>&1 || true
+amixer -c 0 cset name='SEC_MI2S_RX Audio Mixer MultiMedia5' 1,1 >/dev/null 2>&1 || true
+amixer -c 0 cset name='SEC_MI2S_RX_DL_HL Switch' 1 >/dev/null 2>&1 || true
+amixer -c 0 cset name='TFA Profile' 0 >/dev/null 2>&1 || true
+amixer -c 0 cset name='SmartPA Mute' 0 >/dev/null 2>&1 || true
 
 # 2. Microphone Capture Routing
 # NOTE: Raw ALSA routing to TX_CDC_DMA_TX_3 (port 0xb037) causes Qualcomm QDSP6 kernel panic
 # if opened without ACDB calibration. Set mixer to 0 by default to prevent reboot loops.
-amixer -D hw:0 cset name='MultiMedia1 Mixer TX_CDC_DMA_TX_3' 0 >/dev/null 2>&1 || true
-
+amixer -c 0 cset name='MultiMedia1 Mixer TX_CDC_DMA_TX_3' 0 >/dev/null 2>&1 || true
 
 # 3. PulseAudio default sink/source check
 for user_runtime in /run/user/*; do

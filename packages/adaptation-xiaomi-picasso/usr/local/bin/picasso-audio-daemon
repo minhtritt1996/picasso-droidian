@@ -1,0 +1,66 @@
+#!/usr/bin/env python3
+import os
+import struct
+import time
+import fcntl
+
+I2C_SLAVE_FORCE = 0x0706
+
+def get_i2c():
+    try:
+        fd = os.open("/dev/i2c-1", os.O_RDWR)
+        fcntl.ioctl(fd, I2C_SLAVE_FORCE, 0x34)
+        return fd
+    except Exception:
+        return None
+
+def write_reg(fd, r, v):
+    os.write(fd, bytes([r]) + struct.pack(">H", v))
+
+def read_reg(fd, r):
+    os.write(fd, bytes([r]))
+    return struct.unpack(">H", os.read(fd, 2))[0]
+
+def is_audio_running():
+    for p in ["/proc/asound/card0/pcm0p/sub0/status", "/proc/asound/card0/pcm9p/sub0/status"]:
+        try:
+            with open(p, "r") as f:
+                if "state: RUNNING" in f.read():
+                    return True
+        except Exception:
+            pass
+    return False
+
+def ensure_tfa_operating(fd):
+    try:
+        r14 = read_reg(fd, 0x14)
+        man_state = (r14 >> 3) & 0x0f
+        r11 = read_reg(fd, 0x11)
+        amps = (r11 >> 14) & 1
+        clks = (r11 >> 7) & 1
+        if man_state != 9 or amps == 0 or clks == 0:
+            # 64-BCK 24-bit slot configuration for Qualcomm LPASS Secondary MI2S
+            write_reg(fd, 0x20, 0x2890)
+            write_reg(fd, 0x21, 0xc1f1)
+            write_reg(fd, 0x22, 0x047c)
+            write_reg(fd, 0x01, 0x0004)
+            write_reg(fd, 0x00, 0x0038)
+    except Exception:
+        pass
+
+def main():
+    fd = None
+    while True:
+        if fd is None:
+            fd = get_i2c()
+            if fd is None:
+                time.sleep(1)
+                continue
+        if is_audio_running():
+            ensure_tfa_operating(fd)
+            time.sleep(0.2)
+        else:
+            time.sleep(0.5)
+
+if __name__ == "__main__":
+    main()

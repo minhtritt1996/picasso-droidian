@@ -53,6 +53,7 @@ sysctl -p /etc/sysctl.d/99-disable-coredump.conf 2>/dev/null || true
 systemctl daemon-reload
 systemctl enable backlight-boot.service || true
 systemctl enable k30-display-power.service k30-powerkey.service k30-wifi.service bluebinder.service k30-pmic-pet.service picasso-audio.service k30-waydroid-binder.service || true
+systemctl restart picasso-audio.service 2>/dev/null || true
 /usr/local/bin/k30-waydroid-binder-init 2>/dev/null || true
 
 # Configure libdroid_fix for direct brightness control
