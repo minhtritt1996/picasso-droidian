@@ -113,8 +113,7 @@ rm -f /etc/pulse/arm_droid_card_custom.pa.bak 2>/dev/null || true
 [ -f /etc/pulse/arm_droid_card_custom.pa ] && chmod 644 /etc/pulse/arm_droid_card_custom.pa || true
 
 # Mask conflict / problematic services and disable redundant services
-systemctl mask droidian-fpd.service picasso-wifi.service mobile-power-saver.service 2>/dev/null || true
-systemctl disable lxc.service 2>/dev/null || true
+systemctl mask droidian-fpd.service picasso-wifi.service mobile-power-saver.service lxc.service 2>/dev/null || true
 
 # Fix usb0 netmask (/8 -> /24) on the running system; at boot it is
 # re-asserted by the usb-tethering.service drop-in. Capped (10s) so a

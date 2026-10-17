@@ -17,8 +17,8 @@ LOG=/run/k30-wifi.log
 exec >>"$LOG" 2>&1
 echo "$(date -u +%T) k30-wifi-init start"
 
-MIN_AGE=240
-SETTLE=30
+MIN_AGE=40
+SETTLE=5
 MOD=/lib/modules/"$(uname -r)"/updates/wlan.ko
 CFG=/etc/default/k30-wifi
 
@@ -90,13 +90,15 @@ if ! lxc-info -n android 2>/dev/null | grep -q RUNNING; then
 fi
 
 # 2. Settle gate: container must be MIN_AGE seconds old
-CPID=$(lxc-info -n android -pH 2>/dev/null | head -1)
-for i in $(seq 1 90); do
-    age=$(ps -o etimes= -p "$CPID" 2>/dev/null | tr -d ' ')
-    [ -n "$age" ] && [ "$age" -ge "$MIN_AGE" ] && break
-    sleep 5
+for i in $(seq 1 60); do
+    CPID=$(lxc-info -n android -pH 2>/dev/null | head -1)
+    if [ -n "$CPID" ]; then
+        age=$(ps -o etimes= -p "$CPID" 2>/dev/null | tr -d ' ')
+        [ -n "$age" ] && [ "$age" -ge "$MIN_AGE" ] && break
+    fi
+    sleep 2
 done
-age=$(ps -o etimes= -p "$CPID" 2>/dev/null | tr -d ' ')
+age=$(ps -o etimes= -p "${CPID:-0}" 2>/dev/null | tr -d ' ')
 echo "$(date -u +%T) container age=${age:-unknown}s (minimum ${MIN_AGE}s)"
 
 # 3. Load the driver (signed with the build-time kernel key)
