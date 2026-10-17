@@ -1,5 +1,5 @@
 Package: adaptation-xiaomi-picasso
-Version: 1.4.8
+Version: 1.4.9
 Architecture: arm64
 Maintainer: Minh Tri <minhtritt1996@gmail.com>
 Depends: adaptation-android-generic, phosh, phoc

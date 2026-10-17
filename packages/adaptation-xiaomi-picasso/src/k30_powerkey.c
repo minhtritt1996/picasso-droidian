@@ -7,14 +7,14 @@
 #include <linux/input.h>
 #include <time.h>
 
-#define DEFAULT_BRIGHTNESS 2048
+#define DEFAULT_BRIGHTNESS 1024
 
 static volatile int s_screen_locked = 0;
 static volatile int s_last_brightness = DEFAULT_BRIGHTNESS;
 
 static int read_brightness(void) {
-    FILE *f = fopen("/sys/class/backlight/panel0-backlight/brightness", "r");
-    if (!f) f = fopen("/sys/class/backlight/backlight/brightness", "r");
+    FILE *f = fopen("/sys/class/backlight/backlight/brightness", "r");
+    if (!f) f = fopen("/sys/class/backlight/panel0-backlight/brightness", "r");
     if (!f) return -1;
     int val = 0;
     if (fscanf(f, "%d", &val) != 1) val = -1;

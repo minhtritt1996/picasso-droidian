@@ -14,7 +14,8 @@
 typedef int gboolean;
 typedef unsigned int guint;
 
-#define BACKLIGHT_SYSFS "/sys/class/backlight/panel0-backlight/brightness"
+#define BACKLIGHT_SYSFS "/sys/class/backlight/backlight/brightness"
+#define BACKLIGHT_FALLBACK "/sys/class/backlight/panel0-backlight/brightness"
 #define MAX_BRIGHTNESS 4095
 
 typedef struct _DroidLeds DroidLeds;
@@ -45,13 +46,14 @@ gboolean droid_leds_is_kind_supported(DroidLeds *self, DroidLedsKind kind) {
 
 guint droid_leds_get_backlight(DroidLeds *self) {
     int fd = open(BACKLIGHT_SYSFS, O_RDONLY);
+    if (fd < 0) fd = open(BACKLIGHT_FALLBACK, O_RDONLY);
     if (fd < 0) {
-        return 255;
+        return 128;
     }
     char buf[16] = {0};
     int n = read(fd, buf, sizeof(buf) - 1);
     close(fd);
-    if (n <= 0) return 255;
+    if (n <= 0) return 128;
     int val = atoi(buf);
     int level = (val * 255) / MAX_BRIGHTNESS;
     if (level < 0) level = 0;
@@ -65,15 +67,19 @@ gboolean droid_leds_set_backlight(DroidLeds *self, guint level, gboolean save) {
     if (val < 20) val = 20;
     if (val > MAX_BRIGHTNESS) val = MAX_BRIGHTNESS;
 
-    int fd = open(BACKLIGHT_SYSFS, O_WRONLY);
-    if (fd >= 0) {
-        char buf[16];
-        int len = snprintf(buf, sizeof(buf), "%d\n", val);
-        if (len > 0) {
-            ssize_t ret = write(fd, buf, (size_t)len);
-            (void)ret;
+    char buf[16];
+    int len = snprintf(buf, sizeof(buf), "%d\n", val);
+    if (len > 0) {
+        int fd1 = open(BACKLIGHT_SYSFS, O_WRONLY);
+        if (fd1 >= 0) {
+            write(fd1, buf, (size_t)len);
+            close(fd1);
         }
-        close(fd);
+        int fd2 = open(BACKLIGHT_FALLBACK, O_WRONLY);
+        if (fd2 >= 0) {
+            write(fd2, buf, (size_t)len);
+            close(fd2);
+        }
     }
     return 1;
 }

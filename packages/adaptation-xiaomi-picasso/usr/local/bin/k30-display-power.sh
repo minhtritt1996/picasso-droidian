@@ -13,14 +13,15 @@ send_panel_init() {
     # 3. Turn on Front White Indicator LED for visibility
     echo 255 > /sys/class/leds/white/brightness 2>/dev/null
 
-    # 4. Set backlight brightness to maximum (4095) in sysfs
-    echo 4095 > /sys/class/backlight/panel0-backlight/brightness 2>/dev/null
-    echo 4095 > /sys/class/backlight/backlight/brightness 2>/dev/null
+    # 4. Set backlight brightness only if uninitialized or near-zero (default ~25%)
+    CUR_B=$(cat /sys/class/backlight/backlight/brightness 2>/dev/null || echo 0)
+    if [ -z "$CUR_B" ] || [ "$CUR_B" -le 100 ]; then
+        echo 1024 > /sys/class/backlight/panel0-backlight/brightness 2>/dev/null
+        echo 1024 > /sys/class/backlight/backlight/brightness 2>/dev/null
+    fi
 
-    # 5. Lock WLED5 hardware registers to direct register control (bypass CABC gate) at max brightness (4095)
+    # 5. Lock WLED5 hardware registers to direct register control (bypass CABC gate) without forcing max level
     echo 0xd951 0x00 > /sys/kernel/debug/regmap/spmi0-05/registers 2>/dev/null
-    echo 0xd953 0xff > /sys/kernel/debug/regmap/spmi0-05/registers 2>/dev/null
-    echo 0xd954 0x0f > /sys/kernel/debug/regmap/spmi0-05/registers 2>/dev/null
     echo 0xd965 0x01 > /sys/kernel/debug/regmap/spmi0-05/registers 2>/dev/null
     echo 0xd965 0x00 > /sys/kernel/debug/regmap/spmi0-05/registers 2>/dev/null
 
@@ -56,9 +57,6 @@ send_panel_init() {
         echo "0x0000F000" > "$DISP_PARAM" 2>/dev/null || true
         echo "0x50000000" > "$DISP_PARAM" 2>/dev/null || true
     fi
-
-    echo 4095 > /sys/class/backlight/panel0-backlight/brightness 2>/dev/null
-    echo 4095 > /sys/class/backlight/backlight/brightness 2>/dev/null
 }
 
 # Run immediate hardware setup
