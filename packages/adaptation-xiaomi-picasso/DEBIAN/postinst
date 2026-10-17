@@ -131,5 +131,10 @@ if [ -f /usr/lib/droidian/device/cc_sound_fixed.gresource ] && [ -x /usr/bin/gno
     fi
 fi
 
+# Configure Flatpak global override for Qt Quick software rendering on Halium
+if command -v flatpak >/dev/null 2>&1; then
+    flatpak override --system --env=QT_QUICK_BACKEND=software 2>/dev/null || true
+fi
+
 echo "=== adaptation-xiaomi-picasso installed successfully ==="
 exit 0

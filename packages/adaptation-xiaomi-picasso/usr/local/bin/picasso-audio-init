@@ -32,21 +32,11 @@ except Exception:
 ' >/dev/null 2>&1 || true
 fi
 
-# 2. Microphone Capture Routing (Primary Mic & Secondary Mic -> WCD938x -> MultiMedia1)
-amixer -D hw:0 cset name='MultiMedia1 Mixer TX_CDC_DMA_TX_3' 1 >/dev/null 2>&1 || true
-amixer -D hw:0 cset name='TX_CDC_DMA_TX_3 Channels' Two >/dev/null 2>&1 || true
-amixer -D hw:0 cset name='TX DEC0 MUX' SWR_MIC >/dev/null 2>&1 || true
-amixer -D hw:0 cset name='TX SMIC MUX0' ADC0 >/dev/null 2>&1 || true
-amixer -D hw:0 cset name='TX_AIF1_CAP Mixer DEC0' 1 >/dev/null 2>&1 || true
-amixer -D hw:0 cset name='ADC1_MIXER Switch' 1 >/dev/null 2>&1 || true
-amixer -D hw:0 cset name='ADC1 Volume' 12 >/dev/null 2>&1 || true
-amixer -D hw:0 cset name='TX DEC1 MUX' SWR_MIC >/dev/null 2>&1 || true
-amixer -D hw:0 cset name='TX SMIC MUX1' ADC3 >/dev/null 2>&1 || true
-amixer -D hw:0 cset name='TX_AIF1_CAP Mixer DEC1' 1 >/dev/null 2>&1 || true
-amixer -D hw:0 cset name='ADC4_MIXER Switch' 1 >/dev/null 2>&1 || true
-amixer -D hw:0 cset name='ADC4 MUX' INP5 >/dev/null 2>&1 || true
-amixer -D hw:0 cset name='ADC4 Volume' 12 >/dev/null 2>&1 || true
-amixer -D hw:0 cset name='TX_DEC0 Volume' 84 >/dev/null 2>&1 || true
+# 2. Microphone Capture Routing
+# NOTE: Raw ALSA routing to TX_CDC_DMA_TX_3 (port 0xb037) causes Qualcomm QDSP6 kernel panic
+# if opened without ACDB calibration. Set mixer to 0 by default to prevent reboot loops.
+amixer -D hw:0 cset name='MultiMedia1 Mixer TX_CDC_DMA_TX_3' 0 >/dev/null 2>&1 || true
+
 
 # 3. PulseAudio default sink/source check
 for user_runtime in /run/user/*; do
