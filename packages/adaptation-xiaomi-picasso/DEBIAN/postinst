@@ -44,7 +44,7 @@ fi
 # Disable kernel coredump safely to prevent translation fault oops
 mkdir -p /etc/sysctl.d
 cat << 'EOF' > /etc/sysctl.d/99-disable-coredump.conf
-kernel.core_pattern = core
+kernel.core_pattern = |/bin/false
 fs.suid_dumpable = 0
 EOF
 sysctl -p /etc/sysctl.d/99-disable-coredump.conf 2>/dev/null || true
@@ -108,12 +108,9 @@ EOF
     fi
 done
 
-# Configure PulseAudio droid-card with correct Android audio policy XML
-if [ -f /etc/pulse/arm_droid_card_custom.pa ]; then
-    mv /etc/pulse/arm_droid_card_custom.pa /etc/pulse/arm_droid_card_custom.pa.bak || true
-fi
-sed -i 's|load-module module-droid-card.*|load-module module-droid-card config=/etc/pulse/audio_policy_configuration.xml rate=48000 voice_virtual_stream=true|' /etc/pulse/default.pa 2>/dev/null || true
-sed -i 's|load-module module-bluetooth-policy.*|load-module module-bluetooth-policy auto_switch=1 a2dp_source=false ag=false|' /etc/pulse/default.pa 2>/dev/null || true
+# PulseAudio ALSA sound configuration
+rm -f /etc/pulse/arm_droid_card_custom.pa.bak 2>/dev/null || true
+[ -f /etc/pulse/arm_droid_card_custom.pa ] && chmod 644 /etc/pulse/arm_droid_card_custom.pa || true
 
 # Mask conflict / problematic services and disable redundant services
 systemctl mask droidian-fpd.service picasso-wifi.service mobile-power-saver.service 2>/dev/null || true

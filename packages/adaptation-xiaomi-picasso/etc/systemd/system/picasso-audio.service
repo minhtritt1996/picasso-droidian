@@ -4,9 +4,11 @@ After=adspboot.service sound.target
 Wants=sound.target
 
 [Service]
-Type=oneshot
+Type=simple
 RemainAfterExit=yes
 ExecStart=/usr/local/bin/picasso-audio-init
+Restart=on-failure
+RestartSec=5
 
 [Install]
 WantedBy=multi-user.target

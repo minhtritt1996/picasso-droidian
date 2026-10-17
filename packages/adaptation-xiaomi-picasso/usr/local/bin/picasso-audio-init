@@ -1,9 +1,8 @@
 #!/bin/bash
 # Initialize audio routing for Xiaomi Redmi K30 5G (picasso)
 
-# Wait for sound card to appear (ADSP boot). On cold boot the ASoC card can
-# take >60s to register (kona-asoc-snd probes around t=40s), so wait up to 5 min.
-for i in $(seq 1 15); do
+# Wait for sound card to appear (ADSP boot).
+for i in $(seq 1 90); do
     if [ -e /dev/snd/controlC0 ]; then
         break
     fi
@@ -17,6 +16,7 @@ fi
 
 # 1. Speaker Playback Routing (MultiMedia1 -> SEC_MI2S_RX -> TFA9874)
 amixer -D hw:0 cset name='SEC_MI2S_RX Audio Mixer MultiMedia1' 1 >/dev/null 2>&1
+amixer -D hw:0 cset name='SEC_MI2S_RX_DL_HL Switch' 1 >/dev/null 2>&1
 amixer -D hw:0 cset name='TFA Profile' 0 >/dev/null 2>&1
 
 # 2. Microphone Capture Routing (Primary Mic & Secondary Mic -> WCD938x -> MultiMedia1)
@@ -41,8 +41,12 @@ for user_runtime in /run/user/*; do
         uid=$(basename "$user_runtime")
         user_name=$(id -nu "$uid" 2>/dev/null || true)
         if [ -n "$user_name" ]; then
-            su - "$user_name" -c "XDG_RUNTIME_DIR=$user_runtime pactl set-default-sink sink.primary_output" 2>/dev/null || true
-            su - "$user_name" -c "XDG_RUNTIME_DIR=$user_runtime pactl set-default-source source.primary_input" 2>/dev/null || true
+            if ! su - "$user_name" -c "XDG_RUNTIME_DIR=$user_runtime pactl list short sinks" 2>/dev/null | grep -q 'speaker'; then
+                su - "$user_name" -c "XDG_RUNTIME_DIR=$user_runtime systemctl --user restart pulseaudio" 2>/dev/null || true
+                sleep 1
+            fi
+            su - "$user_name" -c "XDG_RUNTIME_DIR=$user_runtime pactl set-default-sink speaker" 2>/dev/null || true
+            su - "$user_name" -c "XDG_RUNTIME_DIR=$user_runtime pactl set-default-source mic" 2>/dev/null || true
         fi
     fi
 done
