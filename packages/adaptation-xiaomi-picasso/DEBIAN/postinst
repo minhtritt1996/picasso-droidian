@@ -109,7 +109,7 @@ EOF
 done
 
 # PulseAudio sound configuration: use native module-droid-card (HIDL Audio HAL)
-[ -f /etc/pulse/arm_droid_card_custom.pa ] && chmod 644 /etc/pulse/arm_droid_card_custom.pa || true
+rm -f /etc/pulse/arm_droid_card_custom.pa /etc/pulse/arm_droid_card_custom.pa.* 2>/dev/null || true
 sed -i 's/^load-module module-native-protocol-unix.*/load-module module-native-protocol-unix srbchannel=no/' /etc/pulse/default.pa 2>/dev/null || true
 
 # Mask conflict / problematic services and disable redundant services
