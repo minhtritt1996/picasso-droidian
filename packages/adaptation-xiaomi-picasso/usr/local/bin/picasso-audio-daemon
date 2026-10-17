@@ -15,11 +15,41 @@ def get_i2c():
         return None
 
 def write_reg(fd, r, v):
-    os.write(fd, bytes([r]) + struct.pack(">H", v))
+    try:
+        os.write(fd, bytes([r]) + struct.pack(">H", v))
+    except Exception:
+        pass
 
 def read_reg(fd, r):
-    os.write(fd, bytes([r]))
-    return struct.unpack(">H", os.read(fd, 2))[0]
+    try:
+        os.write(fd, bytes([r]))
+        return struct.unpack(">H", os.read(fd, 2))[0]
+    except Exception:
+        return None
+
+def apply_trims(fd):
+    try:
+        write_reg(fd, 0x0f, 0x5a6b)
+        fb = read_reg(fd, 0xfb)
+        if fb is not None:
+            write_reg(fd, 0xa0, fb ^ 0x005a)
+        write_reg(fd, 0x0f, 0x0000)
+
+        write_reg(fd, 0x02, 0x22c8)
+        write_reg(fd, 0x52, 0x57dc)
+        write_reg(fd, 0x53, 0x003e)
+        write_reg(fd, 0x56, 0x0400)
+        write_reg(fd, 0x61, 0x0110)
+        write_reg(fd, 0x6f, 0x00a5)
+        write_reg(fd, 0x70, 0x07f8)
+        write_reg(fd, 0x73, 0x0047)
+        write_reg(fd, 0x74, 0x5098)
+        write_reg(fd, 0x75, 0x8d28)
+        write_reg(fd, 0x80, 0x0000)
+        write_reg(fd, 0x83, 0x0799)
+        write_reg(fd, 0x84, 0x0081)
+    except Exception:
+        pass
 
 def is_audio_running():
     for p in ["/proc/asound/card0/pcm0p/sub0/status", "/proc/asound/card0/pcm9p/sub0/status"]:
@@ -34,32 +64,53 @@ def is_audio_running():
 def ensure_tfa_operating(fd):
     try:
         r14 = read_reg(fd, 0x14)
-        man_state = (r14 >> 3) & 0x0f
         r11 = read_reg(fd, 0x11)
-        amps = (r11 >> 14) & 1
-        clks = (r11 >> 7) & 1
-        if man_state != 9 or amps == 0 or clks == 0:
-            # 64-BCK 24-bit slot configuration for Qualcomm LPASS Secondary MI2S
-            write_reg(fd, 0x20, 0x2890)
-            write_reg(fd, 0x21, 0xc1f1)
-            write_reg(fd, 0x22, 0x047c)
-            write_reg(fd, 0x01, 0x0004)
-            write_reg(fd, 0x00, 0x0038)
+        r00 = read_reg(fd, 0x00)
+        
+        man_state = ((r14 >> 3) & 0x0f) if r14 is not None else 0
+        amps = ((r11 >> 14) & 1) if r11 is not None else 0
+        
+        if man_state != 9 or amps == 0 or (r00 is not None and (r00 & 0x08) == 0):
+            apply_trims(fd)
+            # 32-BCK configuration matching Qualcomm LPASS 16-bit stereo clock
+            write_reg(fd, 0x20, 0x0890)
+            write_reg(fd, 0x21, 0xc0f1)
+            write_reg(fd, 0x22, 0x043c)
+            write_reg(fd, 0x23, 0x0003)
+            write_reg(fd, 0x26, 0x0010)
+            write_reg(fd, 0x01, 0x0004) # MANSCONF=1
+            write_reg(fd, 0x00, 0x0038) # AMPE=1, DCA=1
+    except Exception:
+        pass
+
+def powerdown_tfa(fd):
+    try:
+        r00 = read_reg(fd, 0x00)
+        if r00 is not None and (r00 & 0x08):
+            write_reg(fd, 0x00, 0x0010)
     except Exception:
         pass
 
 def main():
     fd = None
+    was_running = False
     while True:
         if fd is None:
             fd = get_i2c()
             if fd is None:
                 time.sleep(1)
                 continue
-        if is_audio_running():
+            apply_trims(fd)
+
+        running = is_audio_running()
+        if running:
             ensure_tfa_operating(fd)
+            was_running = True
             time.sleep(0.2)
         else:
+            if was_running:
+                powerdown_tfa(fd)
+                was_running = False
             time.sleep(0.5)
 
 if __name__ == "__main__":
