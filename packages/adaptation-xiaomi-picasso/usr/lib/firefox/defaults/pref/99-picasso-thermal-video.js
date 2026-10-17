@@ -3,8 +3,6 @@
 //    Qualcomm SM7250 does not have AV1 hardware decode. Software AV1 pushes all 8 CPU cores to 100%,
 //    causing extreme heat and thermal throttling. H.264 runs efficiently at 10-15% CPU load.
 pref("media.av1.enabled", false);
-pref("media.mediasource.vp9.enabled", false);
-pref("media.webm.enabled", false);
 
 // 2. Optimized Software WebRender (Swgl)
 pref("gfx.webrender.all", false);

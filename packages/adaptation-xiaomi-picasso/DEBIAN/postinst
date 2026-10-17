@@ -109,8 +109,9 @@ EOF
 done
 
 # PulseAudio ALSA sound configuration
-rm -f /etc/pulse/arm_droid_card_custom.pa.bak 2>/dev/null || true
+rm -f /etc/pulse/arm_droid_card_custom.pa.bak /etc/systemd/user/pulseaudio.service.d/99-debug.conf 2>/dev/null || true
 [ -f /etc/pulse/arm_droid_card_custom.pa ] && chmod 644 /etc/pulse/arm_droid_card_custom.pa || true
+sed -i 's/^load-module module-native-protocol-unix.*/load-module module-native-protocol-unix srbchannel=no/' /etc/pulse/default.pa 2>/dev/null || true
 
 # Mask conflict / problematic services and disable redundant services
 systemctl mask droidian-fpd.service picasso-wifi.service mobile-power-saver.service lxc.service 2>/dev/null || true
