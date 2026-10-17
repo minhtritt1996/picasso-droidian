@@ -18,6 +18,20 @@ amixer -D hw:0 cset name='SEC_MI2S_RX Audio Mixer MultiMedia1' 1 >/dev/null 2>&1
 amixer -D hw:0 cset name='SEC_MI2S_RX_DL_HL Switch' 1 >/dev/null 2>&1 || true
 amixer -D hw:0 cset name='TFA Profile' 0 >/dev/null 2>&1 || true
 
+# Initialize TFA9874 SmartPA registers for 16-bit 32-BCK Qualcomm LPASS Secondary MI2S
+if [ -e /sys/bus/i2c/devices/1-0034/reg ]; then
+    python3 -c '
+try:
+    with open("/sys/bus/i2c/devices/1-0034/reg", "wb") as f_reg, open("/sys/bus/i2c/devices/1-0034/rw", "wb") as f_rw:
+        f_reg.write(bytes([0x20])); f_rw.write((0x0890).to_bytes(2, "big"))
+        f_reg.write(bytes([0x21])); f_rw.write((0xc0f1).to_bytes(2, "big"))
+        f_reg.write(bytes([0x01])); f_rw.write((0x0004).to_bytes(2, "big"))
+        f_reg.write(bytes([0x00])); f_rw.write((0x0018).to_bytes(2, "big"))
+except Exception:
+    pass
+' >/dev/null 2>&1 || true
+fi
+
 # 2. Microphone Capture Routing (Primary Mic & Secondary Mic -> WCD938x -> MultiMedia1)
 amixer -D hw:0 cset name='MultiMedia1 Mixer TX_CDC_DMA_TX_3' 1 >/dev/null 2>&1 || true
 amixer -D hw:0 cset name='TX_CDC_DMA_TX_3 Channels' Two >/dev/null 2>&1 || true
@@ -44,6 +58,11 @@ for user_runtime in /run/user/*; do
             target_src=$(su - "$user_name" -c "XDG_RUNTIME_DIR=$user_runtime pactl list short sources" 2>/dev/null | awk '{print $2}' | grep -E 'mic|source\.primary_input' | head -n1)
             [ -n "$target_sink" ] && su - "$user_name" -c "XDG_RUNTIME_DIR=$user_runtime pactl set-default-sink $target_sink" 2>/dev/null || true
             [ -n "$target_src" ] && su - "$user_name" -c "XDG_RUNTIME_DIR=$user_runtime pactl set-default-source $target_src" 2>/dev/null || true
+            # Ensure feedbackd is unmuted
+            fbd_prof=$(su - "$user_name" -c "XDG_RUNTIME_DIR=$user_runtime gsettings get org.sigxcpu.feedbackd profile" 2>/dev/null || true)
+            if [ "$fbd_prof" = "'silent'" ]; then
+                su - "$user_name" -c "XDG_RUNTIME_DIR=$user_runtime gsettings set org.sigxcpu.feedbackd profile 'full'" 2>/dev/null || true
+            fi
         fi
     fi
 done
