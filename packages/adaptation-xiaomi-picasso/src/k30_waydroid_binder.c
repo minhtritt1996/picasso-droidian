@@ -6,6 +6,7 @@
 #include <string.h>
 #include <sys/ioctl.h>
 #include <sys/stat.h>
+#include <sys/mount.h>
 #include <linux/types.h>
 
 #define BINDERFS_MAX_NAME 255
@@ -27,6 +28,11 @@ static const char *NODES[] = {
 
 int main(void) {
     int fd = open("/dev/binderfs/binder-control", O_RDWR);
+    if (fd < 0) {
+        mkdir("/dev/binderfs", 0755);
+        mount("binder", "/dev/binderfs", "binder", 0, NULL);
+        fd = open("/dev/binderfs/binder-control", O_RDWR);
+    }
     if (fd < 0) {
         perror("open /dev/binderfs/binder-control");
         return 1;
