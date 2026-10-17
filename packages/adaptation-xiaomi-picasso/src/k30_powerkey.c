@@ -44,6 +44,7 @@ static void apply_screen_state(int locked) {
         int b = s_last_brightness;
         if (b <= 100) b = DEFAULT_BRIGHTNESS;
         write_brightness(b);
+        system("/usr/local/bin/k30-display-power.sh >/dev/null 2>&1 &");
     }
 }
 

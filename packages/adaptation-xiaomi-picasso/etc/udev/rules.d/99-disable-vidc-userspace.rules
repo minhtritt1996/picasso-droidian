@@ -1,0 +1,5 @@
+# Disable Qualcomm Venus V4L2 decoder/encoder for unprivileged desktop userspace
+# to prevent kernel panics when browsers (Epiphany, Firefox) probe video decoders
+SUBSYSTEM=="video4linux", KERNEL=="video32|video33|video34", MODE="0600", OWNER="root", GROUP="root"
+SUBSYSTEM=="video4linux", ATTRS{name}=="msm_vidc*", MODE="0600", OWNER="root", GROUP="root"
+DRIVERS=="msm_vidc_v4l2", MODE="0600", OWNER="root", GROUP="root"

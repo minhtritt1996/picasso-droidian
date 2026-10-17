@@ -54,7 +54,12 @@ systemctl daemon-reload
 systemctl enable backlight-boot.service || true
 systemctl enable k30-display-power.service k30-powerkey.service k30-wifi.service bluebinder.service k30-pmic-pet.service picasso-audio.service k30-waydroid-binder.service || true
 systemctl restart picasso-audio.service 2>/dev/null || true
+systemctl restart k30-powerkey.service 2>/dev/null || true
 /usr/local/bin/k30-waydroid-binder-init 2>/dev/null || true
+udevadm control --reload-rules 2>/dev/null || true
+udevadm trigger --subsystem-match=video4linux 2>/dev/null || true
+chmod 0600 /dev/video32 /dev/video33 /dev/video34 2>/dev/null || true
+cp /usr/lib/droidian/device/droidian-camera.conf /etc/droidian-camera.conf 2>/dev/null || true
 
 # Configure libdroid_fix for direct brightness control
 if ! grep -qs "/usr/local/lib/libdroid_fix.so" /etc/ld.so.preload 2>/dev/null; then
