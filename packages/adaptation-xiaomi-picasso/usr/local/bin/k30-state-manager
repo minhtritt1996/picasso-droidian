@@ -30,16 +30,14 @@ save_state() {
 }
 
 restore_state() {
-    [ ! -f "$STATE_FILE" ] && return 0
-    # shellcheck disable=SC1090
-    . "$STATE_FILE"
+    [ -f "$STATE_FILE" ] && . "$STATE_FILE"
 
-    # Restore Brightness
-    if [ -n "${SAVED_BRIGHTNESS:-}" ] && [ "$SAVED_BRIGHTNESS" -gt 50 ]; then
-        echo "[+] Restoring brightness to $SAVED_BRIGHTNESS"
-        echo "$SAVED_BRIGHTNESS" > /sys/class/backlight/backlight/brightness 2>/dev/null || true
-        echo "$SAVED_BRIGHTNESS" > /sys/class/backlight/panel0-backlight/brightness 2>/dev/null || true
-    fi
+    # Restore Brightness (default to 2048 if missing or <= 50)
+    local BR=${SAVED_BRIGHTNESS:-2048}
+    [ "$BR" -le 50 ] && BR=2048
+    echo "[+] Restoring brightness to $BR"
+    echo "$BR" > /sys/class/backlight/backlight/brightness 2>/dev/null || true
+    echo "$BR" > /sys/class/backlight/panel0-backlight/brightness 2>/dev/null || true
 
     # Restore Volume
     if [ -n "${SAVED_VOLUME:-}" ]; then

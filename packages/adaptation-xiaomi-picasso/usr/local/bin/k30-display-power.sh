@@ -16,8 +16,8 @@ send_panel_init() {
     # 4. Set backlight brightness only if uninitialized or near-zero (default ~25%)
     CUR_B=$(cat /sys/class/backlight/backlight/brightness 2>/dev/null || echo 0)
     if [ -z "$CUR_B" ] || [ "$CUR_B" -le 100 ]; then
-        echo 1024 > /sys/class/backlight/panel0-backlight/brightness 2>/dev/null
-        echo 1024 > /sys/class/backlight/backlight/brightness 2>/dev/null
+        echo 1200 > /sys/class/backlight/panel0-backlight/brightness 2>/dev/null
+        echo 1200 > /sys/class/backlight/backlight/brightness 2>/dev/null
     fi
 
     # 5. Lock WLED5 hardware registers to direct register control (bypass CABC gate) without forcing max level
@@ -35,7 +35,7 @@ send_panel_init() {
         echo 0x15 0x01 0x00 0x00 0x00 0x00 0x02 0x43 0x08 > /sys/kernel/debug/dri/0/DSI-1/tx_cmd 2>/dev/null
         echo 0x15 0x01 0x00 0x00 0x00 0x00 0x02 0x40 0x25 > /sys/kernel/debug/dri/0/DSI-1/tx_cmd 2>/dev/null
         echo 0x15 0x01 0x00 0x00 0x00 0x00 0x02 0xFF 0x10 > /sys/kernel/debug/dri/0/DSI-1/tx_cmd 2>/dev/null
-        echo 0x39 0x01 0x00 0x00 0x00 0x00 0x03 0x51 0x0F 0xFF > /sys/kernel/debug/dri/0/DSI-1/tx_cmd 2>/dev/null
+        echo 0x39 0x01 0x00 0x00 0x00 0x00 0x03 0x51 0x04 0xB0 > /sys/kernel/debug/dri/0/DSI-1/tx_cmd 2>/dev/null
         echo 0x15 0x01 0x00 0x00 0x00 0x00 0x02 0x53 0x24 > /sys/kernel/debug/dri/0/DSI-1/tx_cmd 2>/dev/null
     fi
 
@@ -75,3 +75,13 @@ if [ ! -w /sys/kernel/debug/dri/0/DSI-1/tx_cmd ]; then
         done
     ) &
 fi
+
+# Ensure Wayland output is enabled
+export XDG_RUNTIME_DIR=/run/user/32011
+export WAYLAND_DISPLAY=wayland-0
+for i in $(seq 1 30); do
+    if [ -S /run/user/32011/wayland-0 ]; then
+        wlr-randr --output HWCOMPOSER-1 --on --mode 1080x2400@120Hz 2>/dev/null && break
+    fi
+    sleep 0.5
+done &
