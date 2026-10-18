@@ -13,11 +13,15 @@ send_panel_init() {
     # 3. Turn on Front White Indicator LED for visibility
     echo 255 > /sys/class/leds/white/brightness 2>/dev/null
 
-    # 4. Set backlight brightness only if uninitialized or near-zero (default ~25%)
+    # 4. Restore backlight brightness (persisted level or 50% default) if near-zero
     CUR_B=$(cat /sys/class/backlight/backlight/brightness 2>/dev/null || echo 0)
     if [ -z "$CUR_B" ] || [ "$CUR_B" -le 100 ]; then
-        echo 1200 > /sys/class/backlight/panel0-backlight/brightness 2>/dev/null
-        echo 1200 > /sys/class/backlight/backlight/brightness 2>/dev/null
+        if [ -x /usr/local/bin/k30-backlight.sh ]; then
+            /usr/local/bin/k30-backlight.sh restore 2>/dev/null || true
+        else
+            echo 2048 > /sys/class/backlight/panel0-backlight/brightness 2>/dev/null || true
+            echo 2048 > /sys/class/backlight/backlight/brightness 2>/dev/null || true
+        fi
     fi
 
     # 5. Lock WLED5 hardware registers to direct register control (bypass CABC gate) without forcing max level
@@ -25,8 +29,8 @@ send_panel_init() {
     echo 0xd965 0x01 > /sys/kernel/debug/regmap/spmi0-05/registers 2>/dev/null
     echo 0xd965 0x00 > /sys/kernel/debug/regmap/spmi0-05/registers 2>/dev/null
 
-    # 6. Initialize panel sleep out and display on
-    if [ -w /sys/kernel/debug/dri/0/DSI-1/tx_cmd ]; then
+    # 6. Initialize panel sleep out and display on (run once per boot to prevent active scanout desync)
+    if [ ! -f /run/k30-panel-init.done ] && [ -w /sys/kernel/debug/dri/0/DSI-1/tx_cmd ]; then
         echo 0x05 0x01 0x00 0x00 0x46 0x00 0x01 0x11 > /sys/kernel/debug/dri/0/DSI-1/tx_cmd 2>/dev/null
         echo 0x05 0x01 0x00 0x00 0x00 0x00 0x01 0x29 > /sys/kernel/debug/dri/0/DSI-1/tx_cmd 2>/dev/null
         echo 0x15 0x01 0x00 0x00 0x00 0x00 0x02 0xFF 0x27 > /sys/kernel/debug/dri/0/DSI-1/tx_cmd 2>/dev/null
@@ -37,6 +41,7 @@ send_panel_init() {
         echo 0x15 0x01 0x00 0x00 0x00 0x00 0x02 0xFF 0x10 > /sys/kernel/debug/dri/0/DSI-1/tx_cmd 2>/dev/null
         echo 0x39 0x01 0x00 0x00 0x00 0x00 0x03 0x51 0x04 0xB0 > /sys/kernel/debug/dri/0/DSI-1/tx_cmd 2>/dev/null
         echo 0x15 0x01 0x00 0x00 0x00 0x00 0x02 0x53 0x24 > /sys/kernel/debug/dri/0/DSI-1/tx_cmd 2>/dev/null
+        touch /run/k30-panel-init.done 2>/dev/null || true
     fi
 
     # 7. Disable idle power collapse to prevent watchdog reboot

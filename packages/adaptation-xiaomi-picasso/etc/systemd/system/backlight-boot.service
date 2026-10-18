@@ -1,10 +1,13 @@
 [Unit]
-Description=Set display backlight to max on boot
+Description=Restore display backlight on boot (save on shutdown, default 50%)
 After=phosh.service
+DefaultDependencies=no
+Before=shutdown.target
 
 [Service]
 Type=oneshot
-ExecStart=/bin/sh -c 'echo 4095 > /sys/class/backlight/backlight/brightness 2>/dev/null || true'
+ExecStart=/usr/local/bin/k30-backlight.sh restore
+ExecStop=/usr/local/bin/k30-backlight.sh save
 RemainAfterExit=yes
 
 [Install]

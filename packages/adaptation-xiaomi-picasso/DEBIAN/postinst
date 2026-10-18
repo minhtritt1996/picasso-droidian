@@ -55,13 +55,17 @@ fi
 mkdir -p /etc/sysctl.d
 cat << 'EOF' > /etc/sysctl.d/99-disable-coredump.conf
 kernel.core_pattern = |/bin/false
+kernel.core_uses_pid = 0
 fs.suid_dumpable = 0
+kernel.panic_on_oops = 0
+kernel.panic = 0
 EOF
 sysctl -p /etc/sysctl.d/99-disable-coredump.conf 2>/dev/null || true
 
 # Enable systemd services
 systemctl daemon-reload
 systemctl enable backlight-boot.service || true
+/usr/local/bin/k30-backlight.sh restore 2>/dev/null || true
 systemctl enable k30-display-power.service k30-powerkey.service k30-wifi.service bluebinder.service k30-pmic-pet.service picasso-audio.service k30-waydroid-binder.service k30-power-cap.service || true
 systemctl mask systemd-backlight@backlight:panel0-backlight.service 2>/dev/null || true
 /usr/local/bin/k30-power-cap.sh 2>/dev/null || true
