@@ -1,6 +1,16 @@
 #!/bin/bash
 set -e
 
+# Usrmerge safety check: ensure /lib is a symlink to usr/lib
+if [ -d /lib ] && [ ! -L /lib ]; then
+    echo "=== Restoring /lib usrmerge symlink ==="
+    mkdir -p /usr/lib/modules /usr/lib/firmware
+    cp -a /lib/* /usr/lib/ 2>/dev/null || true
+    rm -rf /lib
+    ln -sf usr/lib /lib
+    echo "=== /lib usrmerge symlink restored ==="
+fi
+
 # Update module dependencies
 CURRENT_KVER=$(uname -r)
 if [ -n "$CURRENT_KVER" ] && [ ! -d "/lib/modules/$CURRENT_KVER" ]; then

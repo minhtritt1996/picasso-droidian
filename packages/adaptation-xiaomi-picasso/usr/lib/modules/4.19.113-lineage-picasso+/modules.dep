@@ -1,0 +1,9 @@
+kernel/drivers/video/backlight/lcd.ko:
+kernel/drivers/soc/qcom/llcc_perfmon.ko:
+kernel/drivers/char/rdbg.ko:
+kernel/drivers/media/platform/msm/dvb/adapter/mpq-adapter.ko:
+kernel/drivers/media/platform/msm/dvb/demux/mpq-dmx-hw-plugin.ko: kernel/drivers/media/platform/msm/dvb/adapter/mpq-adapter.ko
+kernel/drivers/staging/qcacld-3.0/wlan.ko:
+kernel/drivers/fragmention/fragmentize.ko:
+kernel/techpack/data/drivers/rmnet/perf/rmnet_perf.ko:
+kernel/techpack/data/drivers/rmnet/shs/rmnet_shs.ko:
