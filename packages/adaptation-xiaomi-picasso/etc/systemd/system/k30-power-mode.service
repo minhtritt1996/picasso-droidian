@@ -1,0 +1,12 @@
+[Unit]
+Description=K30 5G Power Mode Persistence
+After=network.target k30-wifi.service
+Wants=k30-wifi.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/k30-power-mode restore
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

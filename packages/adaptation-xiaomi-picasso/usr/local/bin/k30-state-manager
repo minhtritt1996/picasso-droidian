@@ -1,0 +1,73 @@
+#!/bin/bash
+# K30 5G Brightness & Volume State Persistence Manager
+
+STATE_DIR="/var/lib/droidian"
+STATE_FILE="$STATE_DIR/k30-hardware-state.conf"
+mkdir -p "$STATE_DIR"
+
+PULSE_SOCKET="unix:/run/user/32011/pulse/native"
+
+save_state() {
+    local B VOL
+    # 1. Save Brightness (only if screen is on, i.e., brightness > 50)
+    if [ -r /sys/class/backlight/backlight/brightness ]; then
+        B=$(cat /sys/class/backlight/backlight/brightness 2>/dev/null || echo 0)
+        if [ "$B" -gt 50 ]; then
+            echo "SAVED_BRIGHTNESS=$B" > "$STATE_FILE.tmp"
+        fi
+    fi
+
+    # 2. Save PulseAudio Volume
+    VOL=$(PULSE_SERVER="$PULSE_SOCKET" pactl list sinks 2>/dev/null | grep 'Volume:' | head -1 | grep -o '[0-9]\+%' | head -1 | tr -d '%')
+    if [ -n "$VOL" ]; then
+        echo "SAVED_VOLUME=$VOL" >> "$STATE_FILE.tmp"
+    fi
+
+    if [ -f "$STATE_FILE.tmp" ]; then
+        mv "$STATE_FILE.tmp" "$STATE_FILE"
+        chmod 644 "$STATE_FILE"
+    fi
+}
+
+restore_state() {
+    [ ! -f "$STATE_FILE" ] && return 0
+    # shellcheck disable=SC1090
+    . "$STATE_FILE"
+
+    # Restore Brightness
+    if [ -n "${SAVED_BRIGHTNESS:-}" ] && [ "$SAVED_BRIGHTNESS" -gt 50 ]; then
+        echo "[+] Restoring brightness to $SAVED_BRIGHTNESS"
+        echo "$SAVED_BRIGHTNESS" > /sys/class/backlight/backlight/brightness 2>/dev/null || true
+        echo "$SAVED_BRIGHTNESS" > /sys/class/backlight/panel0-backlight/brightness 2>/dev/null || true
+    fi
+
+    # Restore Volume
+    if [ -n "${SAVED_VOLUME:-}" ]; then
+        echo "[+] Restoring audio volume to ${SAVED_VOLUME}%"
+        PULSE_SERVER="$PULSE_SOCKET" pactl set-sink-volume 0 "${SAVED_VOLUME}%" 2>/dev/null || true
+        PULSE_SERVER="$PULSE_SOCKET" pactl set-sink-volume 1 "${SAVED_VOLUME}%" 2>/dev/null || true
+    fi
+}
+
+daemon_loop() {
+    while true; do
+        save_state
+        sleep 15
+    done
+}
+
+case "$1" in
+    save)
+        save_state
+        ;;
+    restore)
+        restore_state
+        ;;
+    daemon)
+        daemon_loop
+        ;;
+    *)
+        echo "Usage: $0 {save|restore|daemon}"
+        exit 1
+        ;;
+esac

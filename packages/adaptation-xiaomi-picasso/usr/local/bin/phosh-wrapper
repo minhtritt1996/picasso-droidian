@@ -4,18 +4,21 @@ unset WLR_BACKENDS
 unset WLR_RENDERER
 export GSK_RENDERER=cairo
 export XDG_CURRENT_DESKTOP=Phosh:GNOME
-export __EGL_VENDOR_LIBRARY_FILENAMES=/usr/share/glvnd/egl_vendor.d/50_mesa.json
-export QT_QUICK_BACKEND=software
+export GDK_GL=gles
+export EGL_PLATFORM=wayland
+export QT_QPA_PLATFORM=wayland
 export GST_PLUGIN_FEATURE_RANK=v4l2videodec:0,v4l2h264dec:0,v4l2vp9dec:0,v4l2h265dec:0,v4l2videoenc:0,v4l2h264enc:0
 export WEBKIT_GST_HOLEPUNCH=0
 export WEBKIT_DISABLE_DMABUF_RENDERER=1
+export MOZ_ENABLE_WAYLAND=1
 
 # Ensure display power and panel are initialized on session launch
 /usr/local/bin/k30-display-power.sh >/dev/null 2>&1 &
 
 # Import Wayland environment into systemd --user and D-Bus
-systemctl --user import-environment WAYLAND_DISPLAY XDG_CURRENT_DESKTOP GSK_RENDERER __EGL_VENDOR_LIBRARY_FILENAMES QT_QUICK_BACKEND GST_PLUGIN_FEATURE_RANK WEBKIT_GST_HOLEPUNCH WEBKIT_DISABLE_DMABUF_RENDERER
-dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP GSK_RENDERER __EGL_VENDOR_LIBRARY_FILENAMES QT_QUICK_BACKEND GST_PLUGIN_FEATURE_RANK WEBKIT_GST_HOLEPUNCH WEBKIT_DISABLE_DMABUF_RENDERER 2>/dev/null || true
+VARS="WAYLAND_DISPLAY XDG_CURRENT_DESKTOP GSK_RENDERER GDK_GL EGL_PLATFORM QT_QPA_PLATFORM GST_PLUGIN_FEATURE_RANK WEBKIT_GST_HOLEPUNCH WEBKIT_DISABLE_DMABUF_RENDERER MOZ_ENABLE_WAYLAND"
+systemctl --user import-environment $VARS
+dbus-update-activation-environment --systemd $VARS 2>/dev/null || true
 
 # Restart portal services so they pick up WAYLAND_DISPLAY immediately
 systemctl --user restart xdg-desktop-portal-gtk 2>/dev/null || true

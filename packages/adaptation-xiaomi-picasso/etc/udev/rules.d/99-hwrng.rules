@@ -1,0 +1,1 @@
+SUBSYSTEM=="misc", KERNEL=="hw_random", MODE="0666", SYMLINK+="hw_random"

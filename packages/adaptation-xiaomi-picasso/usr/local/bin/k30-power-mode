@@ -1,0 +1,85 @@
+#!/bin/bash
+# K30 5G Power Mode Controller: 24/24 Server Mode vs Battery Saving Mode
+
+STATE_FILE="/etc/k30-power-mode.state"
+
+apply_server() {
+    echo "[+] Enabling 24/24 Always-On Server Mode..."
+    systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.target >/dev/null 2>&1
+    
+    # Disable WiFi power saving
+    if [ -e /sys/class/net/wlan0 ]; then
+        iw dev wlan0 set power_save off 2>/dev/null || true
+        echo "[+] WiFi power save: OFF (Maximum performance & 24/7 connectivity)"
+    fi
+
+    # Disable GNOME/Phosh suspend when idle
+    su - droidian -c 'dbus-run-session gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-battery-type "nothing"' 2>/dev/null || true
+    su - droidian -c 'dbus-run-session gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type "nothing"' 2>/dev/null || true
+
+    echo "server" > "$STATE_FILE"
+    echo "[✓] Server Mode Active: Device will stay awake 24/24 with active WiFi/SSH even when screen turns off."
+}
+
+apply_battery() {
+    echo "[+] Enabling Battery Saver Mode..."
+    systemctl unmask sleep.target suspend.target hibernate.target hybrid-sleep.target >/dev/null 2>&1
+    
+    # Enable WiFi power saving
+    if [ -e /sys/class/net/wlan0 ]; then
+        iw dev wlan0 set power_save on 2>/dev/null || true
+        echo "[+] WiFi power save: ON (Power saving active)"
+    fi
+
+    # Restore GNOME/Phosh suspend when idle
+    su - droidian -c 'dbus-run-session gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-battery-type "suspend"' 2>/dev/null || true
+    su - droidian -c 'dbus-run-session gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-battery-timeout 180' 2>/dev/null || true
+
+    echo "battery" > "$STATE_FILE"
+    echo "[✓] Battery Saver Mode Active: Device will sleep after timeout to conserve battery."
+}
+
+show_status() {
+    MODE="unknown"
+    [ -f "$STATE_FILE" ] && MODE=$(cat "$STATE_FILE")
+    
+    WLAN_PS="unknown"
+    if [ -e /sys/class/net/wlan0 ]; then
+        WLAN_PS=$(iw dev wlan0 get power_save 2>/dev/null | awk '{print $3}')
+    fi
+
+    SUSPEND_STATUS=$(systemctl is-enabled suspend.target 2>/dev/null || echo "masked")
+
+    echo "========================================"
+    echo "  K30 5G Power Management State"
+    echo "========================================"
+    echo "  Configured Mode     : $MODE"
+    echo "  Suspend Target      : $SUSPEND_STATUS"
+    echo "  WiFi Power Save     : $WLAN_PS"
+    echo "========================================"
+}
+
+case "$1" in
+    server)
+        apply_server
+        ;;
+    battery)
+        apply_battery
+        ;;
+    status)
+        show_status
+        ;;
+    restore)
+        CURRENT_MODE="server"
+        [ -f "$STATE_FILE" ] && CURRENT_MODE=$(cat "$STATE_FILE")
+        if [ "$CURRENT_MODE" = "battery" ]; then
+            apply_battery
+        else
+            apply_server
+        fi
+        ;;
+    *)
+        echo "Usage: $0 {server|battery|status}"
+        exit 1
+        ;;
+esac

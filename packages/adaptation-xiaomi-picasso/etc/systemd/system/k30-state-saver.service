@@ -1,0 +1,13 @@
+[Unit]
+Description=Periodically Save K30 Brightness and Audio State
+After=phosh.service
+
+[Service]
+Type=simple
+User=droidian
+ExecStart=/usr/local/bin/k30-state-manager daemon
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
