@@ -1,0 +1,13 @@
+[Unit]
+Description=K30 5G CPU Power Clamping and Brownout Prevention
+DefaultDependencies=no
+After=sysinit.target
+Before=basic.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/k30-power-cap.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=basic.target

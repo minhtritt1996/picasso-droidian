@@ -31,6 +31,20 @@ if [ -f "$LXC_PY" ]; then
     fi
     # Disable copying consumerir permissions
     sed -i 's/copy_list.append(.*consumerir.*)/# &/' "$LXC_PY" 2>/dev/null || true
+
+    # Redirect lxc log to persistent /var/log/waydroid_lxc.log
+    sed -i 's|/tmp/waydroid_lxc.log|/var/log/waydroid_lxc.log|g' "$LXC_PY" 2>/dev/null || true
+
+    # Prevent cgroup v2 freezer crash on Linux 4.19 (no cgroup.freeze support)
+    python3 -c "
+with open('$LXC_PY', 'r') as f:
+    c = f.read()
+if 'def freeze(args):' in c and 'lxc-freeze' in c:
+    c = c.replace('def freeze(args):\n    command = [\"lxc-freeze\", \"-P\", tools.config.defaults[\"lxc\"], \"-n\", \"waydroid\"]\n    tools.helpers.run.user(args, command)', 'def freeze(args):\n    pass')
+    c = c.replace('def unfreeze(args):\n    command = [\"lxc-unfreeze\", \"-P\",\n               tools.config.defaults[\"lxc\"], \"-n\", \"waydroid\"]\n    tools.helpers.run.user(args, command)', 'def unfreeze(args):\n    pass')
+    with open('$LXC_PY', 'w') as f:
+        f.write(c)
+" 2>/dev/null || true
 fi
 
 # 3. Apply LXC config adjustments for clean Android init execution

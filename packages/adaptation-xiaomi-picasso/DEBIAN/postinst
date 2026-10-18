@@ -52,7 +52,9 @@ sysctl -p /etc/sysctl.d/99-disable-coredump.conf 2>/dev/null || true
 # Enable systemd services
 systemctl daemon-reload
 systemctl enable backlight-boot.service || true
-systemctl enable k30-display-power.service k30-powerkey.service k30-wifi.service bluebinder.service k30-pmic-pet.service picasso-audio.service k30-waydroid-binder.service || true
+systemctl enable k30-display-power.service k30-powerkey.service k30-wifi.service bluebinder.service k30-pmic-pet.service picasso-audio.service k30-waydroid-binder.service k30-power-cap.service || true
+systemctl mask systemd-backlight@backlight:panel0-backlight.service 2>/dev/null || true
+/usr/local/bin/k30-power-cap.sh 2>/dev/null || true
 systemctl restart picasso-audio.service 2>/dev/null || true
 systemctl restart k30-powerkey.service 2>/dev/null || true
 /usr/local/bin/k30-waydroid-binder-init 2>/dev/null || true
@@ -146,8 +148,11 @@ fi
 systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.target 2>/dev/null || true
 /usr/local/bin/k30-power-mode server 2>/dev/null || true
 
-# Apply Volatile in-memory journal to eliminate flash wear and loop0 stalls
+# Apply Persistent journal with capped storage
+rm -f /etc/systemd/journald.conf.d/volatile.conf 2>/dev/null || true
+mkdir -p /var/log/journal
 systemctl restart systemd-journald 2>/dev/null || true
+journalctl --flush 2>/dev/null || true
 
 # Restart PMIC guardian with realtime priority
 systemctl restart k30-pmic-pet.service 2>/dev/null || true
