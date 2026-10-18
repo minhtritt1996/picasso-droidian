@@ -10,6 +10,8 @@ apply_server() {
     # Disable WiFi power saving
     if [ -e /sys/class/net/wlan0 ]; then
         iw dev wlan0 set power_save off 2>/dev/null || true
+        active_wifi=$(nmcli -t -f NAME,TYPE c show --active 2>/dev/null | grep -E ':802-11-wireless|:wifi' | cut -d: -f1 | head -n1)
+        [ -n "$active_wifi" ] && nmcli c modify "$active_wifi" 802-11-wireless.powersave 2 2>/dev/null || true
         echo "[+] WiFi power save: OFF (Maximum performance & 24/7 connectivity)"
     fi
 

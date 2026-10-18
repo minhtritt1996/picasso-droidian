@@ -5,9 +5,12 @@ Before=sysinit.target
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/k30-pmic-pet.sh
+ExecStart=/usr/local/bin/k30-pmic-pet
 Restart=always
 RestartSec=1
+Nice=-20
+CPUSchedulingPolicy=rr
+CPUSchedulingPriority=90
 
 [Install]
 WantedBy=sysinit.target

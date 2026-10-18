@@ -142,5 +142,20 @@ if command -v flatpak >/dev/null 2>&1; then
     flatpak override --system --env=QT_QUICK_BACKEND=software 2>/dev/null || true
 fi
 
+# Permanent 24/24 Server Mode: Mask sleep/suspend to prevent PMIC drops and WiFi sleep
+systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.target 2>/dev/null || true
+/usr/local/bin/k30-power-mode server 2>/dev/null || true
+
+# Apply Volatile in-memory journal to eliminate flash wear and loop0 stalls
+systemctl restart systemd-journald 2>/dev/null || true
+
+# Restart PMIC guardian with realtime priority
+systemctl restart k30-pmic-pet.service 2>/dev/null || true
+
+# Platform integration for Waydroid
+if [ -x /usr/local/bin/k30-waydroid-setup.sh ]; then
+    /usr/local/bin/k30-waydroid-setup.sh 2>/dev/null || true
+fi
+
 echo "=== adaptation-xiaomi-picasso installed successfully ==="
 exit 0
