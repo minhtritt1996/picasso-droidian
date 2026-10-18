@@ -40,6 +40,17 @@ if [ -f /usr/lib/droidian/device/vold_patched ]; then
     chmod 755 "$OVERLAY_BIN/vold"
 fi
 
+# Bypass bpfloader in overlay to prevent incompatible eBPF kernel crashes
+if [ -f "$OVERLAY_SYS/bpfloader.rc" ]; then
+    sed -i 's/exec_start bpfloader/setprop bpf.progs_loaded 1/' "$OVERLAY_SYS/bpfloader.rc"
+fi
+cat << 'EOF' > "$OVERLAY_BIN/bpfloader"
+#!/system/bin/sh
+setprop bpf.progs_loaded 1
+exit 0
+EOF
+chmod 755 "$OVERLAY_BIN/bpfloader"
+
 # 2. Patch LXC helper if present
 LXC_PY="/usr/lib/waydroid/tools/helpers/lxc.py"
 if [ -f "$LXC_PY" ]; then
@@ -55,15 +66,15 @@ if 'proc/sysrq-trigger' not in c:
 
 if 'sys/kernel/tracing' not in c:
     c = c.replace('make_entry(\"tmpfs\", \"sys/kernel/debug\"',
-        'make_entry(\"tmpfs\", \"sys/kernel/tracing\", \"tmpfs\", \"nosuid,nodev,noexec 0 0\", check=False)\n    make_entry(\"tmpfs\", \"sys/class/android_usb\", \"tmpfs\", \"nosuid,nodev,noexec 0 0\", check=False)\n    make_entry(\"tmpfs\", \"sys/kernel/debug\"')
-elif 'sys/class/android_usb' not in c:
-    c = c.replace('make_entry(\"tmpfs\", \"sys/kernel/tracing\"',
-        'make_entry(\"tmpfs\", \"sys/class/android_usb\", \"tmpfs\", \"nosuid,nodev,noexec 0 0\", check=False)\n    make_entry(\"tmpfs\", \"sys/kernel/tracing\"')
+        'make_entry(\"tmpfs\", \"sys/kernel/tracing\", \"tmpfs\", \"nosuid,nodev,noexec 0 0\", check=False)\n    make_entry(\"tmpfs\", \"sys/class/android_usb\", \"tmpfs\", \"nosuid,nodev,noexec 0 0\", check=False)\n    make_entry(\"tmpfs\", \"sys/class/power_supply\", \"tmpfs\", \"nosuid,nodev,noexec 0 0\", check=False)\n    make_entry(\"tmpfs\", \"sys/power\", \"tmpfs\", \"nosuid,nodev,noexec 0 0\", check=False)\n    make_entry(\"tmpfs\", \"sys/kernel/debug\"')
+elif 'sys/class/power_supply' not in c:
+    c = c.replace('make_entry(\"tmpfs\", \"sys/class/android_usb\"',
+        'make_entry(\"tmpfs\", \"sys/class/android_usb\", \"tmpfs\", \"nosuid,nodev,noexec 0 0\", check=False)\n    make_entry(\"tmpfs\", \"sys/class/power_supply\", \"tmpfs\", \"nosuid,nodev,noexec 0 0\", check=False)\n    make_entry(\"tmpfs\", \"sys/power\", \"tmpfs\", \"nosuid,nodev,noexec 0 0\", check=False)')
 
 # Ensure GPU acceleration nodes are passed
 if 'make_entry(\"/dev/kgsl-3d0\")' not in c:
     c = c.replace('make_entry(\"/dev/fuse\")',
-        'make_entry(\"/dev/fuse\")\n    make_entry(\"/dev/ion\")\n    make_entry(\"/dev/kgsl-3d0\")')
+        'make_entry(\"/dev/fuse\")\n    make_entry(\"/dev/ion\")\n    make_entry(\"/dev/kgsl-3d0\")\n    make_entry(\"/dev/dri\", options=\"bind,create=dir,optional 0 0\", check=False)')
 
 # Disable copying consumerir permissions
 c = c.replace('copy_list.append(\"/vendor/etc/permissions/android.hardware.consumerir.xml\")', '# consumerir disabled')
@@ -94,6 +105,13 @@ if [ -f "$LXC_CFG" ]; then
     if ! grep -q "lxc.console.path" "$LXC_CFG"; then
         echo "lxc.console.path = none" >> "$LXC_CFG"
     fi
+    # Allow GPU major devices (226 for DRM, 235 for KGSL Adreno 620)
+    if ! grep -q "c 235:\* rwm" "$LXC_CFG"; then
+        sed -i '/c 504:\* rwm/a lxc.cgroup2.devices.allow = c 226:* rwm\nlxc.cgroup2.devices.allow = c 235:* rwm' "$LXC_CFG" 2>/dev/null || true
+    fi
+fi
+if [ -f /usr/lib/waydroid/data/configs/config_base ] && ! grep -q "c 235:\* rwm" /usr/lib/waydroid/data/configs/config_base; then
+    sed -i '/c 504:\* rwm/a lxc.cgroup2.devices.allow = c 226:* rwm\nlxc.cgroup2.devices.allow = c 235:* rwm' /usr/lib/waydroid/data/configs/config_base 2>/dev/null || true
 fi
 
 # 4. Waydroid config and properties
