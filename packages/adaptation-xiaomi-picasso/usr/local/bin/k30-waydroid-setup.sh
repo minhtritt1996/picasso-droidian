@@ -132,13 +132,24 @@ cfg['properties']['ro.sys.fuse'] = 'true'
 cfg['properties']['persist.sys.fflag.override.settings_fuse'] = 'true'
 cfg['properties']['persist.sys.usb.config'] = 'none'
 cfg['properties']['sys.usb.config'] = 'none'
-cfg['properties']['ro.hardware.egl'] = 'adreno'
+cfg['properties']['ro.hardware.egl'] = 'swiftshader'
 cfg['properties']['ro.hardware.gralloc'] = 'default'
 cfg['properties']['persist.waydroid.multi_windows'] = 'true'
 with open('/var/lib/waydroid/waydroid.cfg', 'w') as f:
     cfg.write(f)
 " 2>/dev/null || true
+if [ -f /var/lib/waydroid/waydroid.prop ]; then
+    sed -i 's/^ro.hardware.egl=.*/ro.hardware.egl=swiftshader/' /var/lib/waydroid/waydroid.prop
+    sed -i 's/^ro.hardware.gralloc=.*/ro.hardware.gralloc=default/' /var/lib/waydroid/waydroid.prop
+    sed -i 's/^ro.hardware.vulkan=.*/ro.hardware.vulkan=none/' /var/lib/waydroid/waydroid.prop
 fi
+
+# 5. Disable coredump inside container to prevent kernel 4.19 do_coredump bug
+cat << 'EOF' > "$OVERLAY_SYS/disable_coredump.rc"
+on early-init
+    write /proc/sys/kernel/core_pattern |/bin/false
+    setrlimit 4 0 0
+EOF
 
 echo "[✓] Waydroid platform integration applied successfully."
 exit 0
