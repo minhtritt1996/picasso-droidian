@@ -1,0 +1,1 @@
+# Disabled charger monitor to prevent mount_all and mount_userdata_failed in off-mode charging

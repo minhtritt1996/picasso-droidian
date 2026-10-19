@@ -27,6 +27,13 @@ chmod +x /usr/local/bin/* 2>/dev/null || true
 # ("Skipping insecure file"), so keep them strictly 644 root:root.
 chmod 644 /usr/lib/droid-vendor-overlay/etc/init/*.rc 2>/dev/null || true
 
+# Neutralize charger monitor mount_all in LXC Android container to prevent mount_userdata_failed
+if [ -f /var/lib/lxc/android/pre-start.sh ]; then
+    if ! grep -q "charger_monitor" /var/lib/lxc/android/pre-start.sh; then
+        sed -i 's/vendor_flash_recovery.rc/vendor_flash_recovery.rc vendor.qti.hardware.charger_monitor@1.0-service.rc/' /var/lib/lxc/android/pre-start.sh 2>/dev/null || true
+    fi
+fi
+
 # Compile glib schemas
 if command -v glib-compile-schemas >/dev/null 2>&1; then
     glib-compile-schemas /usr/share/glib-2.0/schemas/ 2>/dev/null || true
