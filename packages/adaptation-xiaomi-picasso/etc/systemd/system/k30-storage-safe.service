@@ -1,0 +1,13 @@
+[Unit]
+Description=Disable ext4 discard on loop and userdata to prevent data=journal buffer lockup
+DefaultDependencies=no
+Before=local-fs.target systemd-remount-fs.service
+After=systemd-udev-settle.service
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c "mount -o remount,nodiscard /userdata 2>/dev/null || true; mount -o remount,nodiscard / 2>/dev/null || true; for q in /sys/block/loop*/queue/discard_max_bytes; do [ -w \"$q\" ] && echo 0 > \"$q\" 2>/dev/null || true; done"
+RemainAfterExit=yes
+
+[Install]
+WantedBy=sysinit.target
