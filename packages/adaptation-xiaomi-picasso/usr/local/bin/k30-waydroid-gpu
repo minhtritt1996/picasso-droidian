@@ -1,0 +1,93 @@
+#!/bin/bash
+# Redmi K30 5G Waydroid GPU Mode Switcher (Adreno 620 <-> SwiftShader)
+
+set -e
+
+ACTION="${1:-status}"
+
+CFG="/var/lib/waydroid/waydroid.cfg"
+PROP="/var/lib/waydroid/waydroid.prop"
+
+set_prop() {
+    local key="$1"
+    local val="$2"
+    if grep -q "^${key}=" "$PROP"; then
+        sed -i "s/^${key}=.*/${key}=${val}/" "$PROP"
+    else
+        echo "${key}=${val}" >> "$PROP"
+    fi
+}
+
+case "$ACTION" in
+    adreno|hardware|gpu)
+        echo "=== Switching Waydroid to Qualcomm Adreno 620 Hardware GPU ==="
+        python3 -c '
+import configparser
+cfg = configparser.ConfigParser()
+cfg.read("/var/lib/waydroid/waydroid.cfg")
+if "properties" not in cfg:
+    cfg["properties"] = {}
+cfg["properties"]["ro.hardware.egl"] = "adreno"
+cfg["properties"]["ro.hardware.vulkan"] = "adreno"
+cfg["properties"]["ro.hardware.gralloc"] = "lito"
+cfg["properties"]["ro.opengles.version"] = "196610"
+with open("/var/lib/waydroid/waydroid.cfg", "w") as f:
+    cfg.write(f)
+'
+        set_prop "ro.hardware.egl" "adreno"
+        set_prop "ro.hardware.vulkan" "adreno"
+        set_prop "ro.hardware.gralloc" "lito"
+        set_prop "ro.opengles.version" "196610"
+        
+        echo "[+] Restarting Waydroid container..."
+        systemctl restart waydroid-container.service
+        echo "[✓] Waydroid GPU set to: Qualcomm Adreno 620 (Hardware Accelerated with gralloc.lito)."
+        ;;
+
+    swiftshader|software|cpu)
+        echo "=== Switching Waydroid to SwiftShader (CPU Software Fallback) ==="
+        python3 -c '
+import configparser
+cfg = configparser.ConfigParser()
+cfg.read("/var/lib/waydroid/waydroid.cfg")
+if "properties" not in cfg:
+    cfg["properties"] = {}
+cfg["properties"]["ro.hardware.egl"] = "swiftshader"
+cfg["properties"]["ro.hardware.vulkan"] = "none"
+cfg["properties"]["ro.hardware.gralloc"] = "default"
+with open("/var/lib/waydroid/waydroid.cfg", "w") as f:
+    cfg.write(f)
+'
+        set_prop "ro.hardware.egl" "swiftshader"
+        set_prop "ro.hardware.vulkan" "none"
+        set_prop "ro.hardware.gralloc" "default"
+        
+        echo "[+] Restarting Waydroid container..."
+        systemctl restart waydroid-container.service
+        echo "[✓] Waydroid GPU set to: SwiftShader (Software)."
+        ;;
+
+    status)
+        echo "=== Waydroid GPU Configuration Status ==="
+        CUR_EGL=$(grep -E '^ro.hardware.egl=' "$PROP" 2>/dev/null | cut -d= -f2 || echo "unknown")
+        CUR_VK=$(grep -E '^ro.hardware.vulkan=' "$PROP" 2>/dev/null | cut -d= -f2 || echo "unknown")
+        CUR_GRALLOC=$(grep -E '^ro.hardware.gralloc=' "$PROP" 2>/dev/null | cut -d= -f2 || echo "unknown")
+        CONTAINER_STATUS=$(systemctl is-active waydroid-container.service 2>/dev/null || echo "inactive")
+
+        echo "EGL Driver       : $CUR_EGL"
+        echo "Vulkan Driver    : $CUR_VK"
+        echo "Gralloc HAL      : $CUR_GRALLOC"
+        echo "Container Service: $CONTAINER_STATUS"
+
+        if [ -f /var/lib/waydroid/overlay_rw/vendor/lib64/egl/libEGL_adreno.so ]; then
+            echo "Adreno Blobs     : Injected (64-bit & 32-bit available in overlay)"
+        else
+            echo "Adreno Blobs     : Not found in overlay"
+        fi
+        ;;
+
+    *)
+        echo "Usage: sudo k30-waydroid-gpu [adreno|swiftshader|status]"
+        exit 1
+        ;;
+esac

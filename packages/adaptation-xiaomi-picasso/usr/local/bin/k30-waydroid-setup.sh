@@ -134,11 +134,6 @@ if [ -f "$LXC_CFG" ]; then
     sed -i 's/sys:ro:rslave/sys:ro/' "$LXC_CFG" 2>/dev/null || true
     # Ensure console logfile is persistent
     sed -i 's|/tmp/init_console.log|/var/log/init_console.log|' "$LXC_CFG" 2>/dev/null || true
-    # Remove any GPU major device rules
-    sed -i '/c 226:\* rwm/d; /c 235:\* rwm/d' "$LXC_CFG" 2>/dev/null || true
-fi
-if [ -f /usr/lib/waydroid/data/configs/config_base ]; then
-    sed -i '/c 226:\* rwm/d; /c 235:\* rwm/d' /usr/lib/waydroid/data/configs/config_base 2>/dev/null || true
 fi
 
 # Create isolated container null device to protect host /dev/null from Android chmod
@@ -200,18 +195,15 @@ cfg['properties']['ro.sys.fuse'] = 'true'
 cfg['properties']['persist.sys.fflag.override.settings_fuse'] = 'true'
 cfg['properties']['persist.sys.usb.config'] = 'none'
 cfg['properties']['sys.usb.config'] = 'none'
-cfg['properties']['ro.hardware.egl'] = 'swiftshader'
-cfg['properties']['ro.hardware.gralloc'] = 'default'
+if 'ro.hardware.egl' not in cfg['properties']:
+    cfg['properties']['ro.hardware.egl'] = 'adreno'
+if 'ro.hardware.gralloc' not in cfg['properties']:
+    cfg['properties']['ro.hardware.gralloc'] = 'lito'
 cfg['properties']['ro.hardware.hwcomposer'] = 'waydroid'
 cfg['properties']['persist.waydroid.multi_windows'] = 'true'
 with open('/var/lib/waydroid/waydroid.cfg', 'w') as f:
     cfg.write(f)
 " 2>/dev/null || true
-fi
-if [ -f /var/lib/waydroid/waydroid.prop ]; then
-    sed -i 's/^ro.hardware.egl=.*/ro.hardware.egl=swiftshader/' /var/lib/waydroid/waydroid.prop
-    sed -i 's/^ro.hardware.gralloc=.*/ro.hardware.gralloc=default/' /var/lib/waydroid/waydroid.prop
-    sed -i 's/^ro.hardware.vulkan=.*/ro.hardware.vulkan=none/' /var/lib/waydroid/waydroid.prop
 fi
 
 # 5. Disable coredump inside container to prevent kernel 4.19 do_coredump bug
