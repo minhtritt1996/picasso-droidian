@@ -43,9 +43,10 @@ mkdir -p "$OVERLAY_VENDOR_HW" "$OVERLAY_VENDOR_INIT"
 for f in init.qcom.rc init.qcom.usb.rc init.qcom.factory.rc init.target.rc; do
     echo '# Disabled for waydroid' > "$OVERLAY_VENDOR_HW/$f"
 done
-# Mask camera provider and hardware omx which trigger power/LDO conflict with host Halium
+# Mask camera provider which triggers power/LDO conflict with host Halium
 echo '# Disabled for waydroid' > "$OVERLAY_VENDOR_INIT/android.hardware.camera.provider@2.4-service.rc"
-echo '# Disabled for waydroid' > "$OVERLAY_VENDOR_INIT/android.hardware.media.omx@1.0-service.rc"
+# Ensure OMX and Codec2 hardware video services remain active for VPU acceleration
+[ -f "$OVERLAY_VENDOR_INIT/android.hardware.media.omx@1.0-service.rc" ] && rm -f "$OVERLAY_VENDOR_INIT/android.hardware.media.omx@1.0-service.rc"
 
 if [ -f "$OVERLAY_SYS/hw/init.rc" ]; then
     sed -i 's|^[[:space:]]*import /vendor/etc/init/hw/init\.\${ro\.hardware}\.rc|# import /vendor/etc/init/hw/init.\${ro.hardware}.rc|' "$OVERLAY_SYS/hw/init.rc"
@@ -113,6 +114,10 @@ c = c.replace('copy_list.append(\"/odm/etc/permissions/android.hardware.consumer
 # Redirect lxc log to persistent /var/log/waydroid_lxc.log
 c = c.replace('/tmp/waydroid_lxc.log', '/var/log/waydroid_lxc.log')
 
+# Add hardware video decoder and encoder nodes
+if 'make_entry(\"/dev/video32\")' not in c:
+    c = c.replace('make_entry(\"/dev/uhid\")', 'make_entry(\"/dev/uhid\")\n    make_entry(\"/dev/video32\")\n    make_entry(\"/dev/video33\")')
+
 # Prevent cgroup v2 freezer crash on Linux 4.19
 if 'def freeze(args):' in c and 'lxc-freeze' in c:
     c = c.replace('def freeze(args):\n    command = [\"lxc-freeze\", \"-P\", tools.config.defaults[\"lxc\"], \"-n\", \"waydroid\"]\n    tools.helpers.run.user(args, command)', 'def freeze(args):\n    pass')
@@ -139,6 +144,8 @@ fi
 # Create isolated container null device to protect host /dev/null from Android chmod
 [ ! -e /var/lib/waydroid/dev_null ] && mknod -m 666 /var/lib/waydroid/dev_null c 1 3 || chmod 666 /var/lib/waydroid/dev_null
 chmod 666 /dev/null 2>/dev/null || true
+# Ensure Qualcomm Venus hardware video nodes are accessible to container
+chmod 666 /dev/video32 /dev/video33 2>/dev/null || true
 
 # Ensure complete and safe config_nodes on disk
 cat << 'EOF' > /var/lib/waydroid/lxc/waydroid/config_nodes
@@ -171,6 +178,9 @@ lxc.mount.entry = none dev/pts devpts defaults,mode=644,ptmxmode=666,create=dir 
 lxc.mount.entry = /dev/uhid dev/uhid none bind,create=file,optional 0 0
 lxc.mount.entry = /dev/net/tun dev/tun none bind,create=file,optional 0 0
 lxc.mount.entry = /var/lib/waydroid/host-permissions vendor/etc/host-permissions none bind,optional 0 0
+lxc.mount.entry = /dev/video32 dev/video32 none bind,create=file,optional 0 0
+lxc.mount.entry = /dev/video33 dev/video33 none bind,create=file,optional 0 0
+lxc.cgroup2.devices.allow = c 81:* rwm
 lxc.mount.entry = tmpfs mnt_extra tmpfs nodev 0 0
 lxc.mount.entry = tmpfs tmp tmpfs nodev 0 0
 lxc.mount.entry = tmpfs var tmpfs nodev 0 0
@@ -201,6 +211,8 @@ if 'ro.hardware.gralloc' not in cfg['properties']:
     cfg['properties']['ro.hardware.gralloc'] = 'lito'
 cfg['properties']['ro.hardware.hwcomposer'] = 'waydroid'
 cfg['properties']['persist.waydroid.multi_windows'] = 'true'
+cfg['properties']['debug.stagefright.ccodec'] = '4'
+cfg['properties']['debug.stagefright.c2inputsurface'] = '1'
 with open('/var/lib/waydroid/waydroid.cfg', 'w') as f:
     cfg.write(f)
 " 2>/dev/null || true
