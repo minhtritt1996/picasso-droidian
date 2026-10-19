@@ -21,8 +21,11 @@ test -f "$DTB" || { echo "missing rec-picasso.dtb"; exit 1; }
 CMDLINE="earlycon=msm_geni_serial,0x4a90000 androidboot.hardware=qcom androidboot.memcg=1 lpm_levels.sleep_disabled=1 msm_rtb.filter=0x237 service_locator.enable=1 swiotlb=2048 androidboot.usbcontroller=a600000.dwc3 loop.max_part=7 androidboot.usbconfigfs=true androidboot.selinux=permissive"
 # NOTE: no console= param (kernel registers ttyHS0, ttyMSM0 never binds).
 
+KERNEL="$ROOT/device/picasso/blobs/Image.gz"
+[ -f "$KERNEL" ] || KERNEL="$ROOT/kernel/out_halium/arch/arm64/boot/Image.gz"
+
 mkbootimg \
-  --kernel "$ROOT/kernel/out_halium/arch/arm64/boot/Image.gz" \
+  --kernel "$KERNEL" \
   --ramdisk "$RD" \
   --dtb "$DTB" \
   --base 0x0 --pagesize 4096 \

@@ -62,6 +62,13 @@ send_panel_init() {
         echo "0x0000F000" > "$DISP_PARAM" 2>/dev/null || true
         echo "0x50000000" > "$DISP_PARAM" 2>/dev/null || true
     fi
+
+    # 10. Disable discard on loop devices and remount /userdata with nodiscard to prevent ext4 data=journal buffer corruption
+    mount -o remount,nodiscard /userdata 2>/dev/null || true
+    mount -o remount,nodiscard / 2>/dev/null || true
+    for q in /sys/block/loop*/queue/discard_max_bytes; do
+        [ -w "$q" ] && echo 0 > "$q" 2>/dev/null || true
+    done
 }
 
 # Run immediate hardware setup

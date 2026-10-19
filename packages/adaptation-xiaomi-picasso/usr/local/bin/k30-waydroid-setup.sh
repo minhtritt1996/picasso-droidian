@@ -10,9 +10,12 @@ OVERLAY_PERM="/var/lib/waydroid/overlay_rw/system/system/etc/permissions"
 OVERLAY_BIN="/var/lib/waydroid/overlay_rw/system/system/bin"
 mkdir -p "$OVERLAY_SYS/hw" "$OVERLAY_PERM" "$OVERLAY_BIN"
 
-# Mask missing Consumer IR HAL to prevent SystemServer crash loop
+# Provide Consumer IR feature permission so ConsumerIrService does not crash SystemServer
 cat << 'EOF' > "$OVERLAY_PERM/android.hardware.consumerir.xml"
-<permissions></permissions>
+<?xml version="1.0" encoding="utf-8"?>
+<permissions>
+    <feature name="android.hardware.consumerir" />
+</permissions>
 EOF
 
 # Mask problematic Android 13 reboot-on-failure triggers
@@ -32,6 +35,31 @@ echo '# Disabled for waydroid' > "$OVERLAY_SYS/llkd.rc"
 echo '# Disabled for waydroid' > "$OVERLAY_SYS/hw/init.usb.rc"
 echo '# Disabled for waydroid' > "$OVERLAY_SYS/hw/init.usb.configfs.rc"
 echo '# Disabled for waydroid' > "$OVERLAY_SYS/usbd.rc"
+
+# Mask Qualcomm hardware scripts to prevent modem/venus subsystem restarts (SSR) inside container
+OVERLAY_VENDOR_HW="/var/lib/waydroid/overlay_rw/vendor/etc/init/hw"
+OVERLAY_VENDOR_INIT="/var/lib/waydroid/overlay_rw/vendor/etc/init"
+mkdir -p "$OVERLAY_VENDOR_HW" "$OVERLAY_VENDOR_INIT"
+for f in init.qcom.rc init.qcom.usb.rc init.qcom.factory.rc init.target.rc; do
+    echo '# Disabled for waydroid' > "$OVERLAY_VENDOR_HW/$f"
+done
+# Mask camera provider and hardware omx which trigger power/LDO conflict with host Halium
+echo '# Disabled for waydroid' > "$OVERLAY_VENDOR_INIT/android.hardware.camera.provider@2.4-service.rc"
+echo '# Disabled for waydroid' > "$OVERLAY_VENDOR_INIT/android.hardware.media.omx@1.0-service.rc"
+
+if [ -f "$OVERLAY_SYS/hw/init.rc" ]; then
+    sed -i 's|^[[:space:]]*import /vendor/etc/init/hw/init\.\${ro\.hardware}\.rc|# import /vendor/etc/init/hw/init.\${ro.hardware}.rc|' "$OVERLAY_SYS/hw/init.rc"
+    sed -i 's|^[[:space:]]*import /init\.\${ro\.hardware}\.rc|# import /init.\${ro.hardware}.rc|' "$OVERLAY_SYS/hw/init.rc"
+fi
+
+# Neutralize camera-provider and adbd in init.waydroid.rc
+if [ -f "$OVERLAY_SYS/init.waydroid.rc" ]; then
+    sed -i 's/^[[:space:]]*start adbd/# start adbd/' "$OVERLAY_SYS/init.waydroid.rc"
+    sed -i 's/service vendor.camera-provider-2-4/service vendor.camera-provider-2-4 \/system\/bin\/true\n    disabled\n# service vendor.camera-provider-2-4/' "$OVERLAY_SYS/init.waydroid.rc"
+fi
+
+
+
 
 # Install anti-sdcardfs patched vold binary
 if [ -f /usr/lib/droidian/device/vold_patched ]; then
@@ -71,13 +99,16 @@ elif 'sys/class/power_supply' not in c:
     c = c.replace('make_entry(\"tmpfs\", \"sys/class/android_usb\"',
         'make_entry(\"tmpfs\", \"sys/class/android_usb\", \"tmpfs\", \"nosuid,nodev,noexec 0 0\", check=False)\n    make_entry(\"tmpfs\", \"sys/class/power_supply\", \"tmpfs\", \"nosuid,nodev,noexec 0 0\", check=False)\n    make_entry(\"tmpfs\", \"sys/power\", \"tmpfs\", \"nosuid,nodev,noexec 0 0\", check=False)')
 
-# Ensure GPU acceleration nodes are passed
-if 'make_entry(\"/dev/kgsl-3d0\")' not in c:
-    c = c.replace('make_entry(\"/dev/fuse\")',
-        'make_entry(\"/dev/fuse\")\n    make_entry(\"/dev/ion\")\n    make_entry(\"/dev/kgsl-3d0\")\n    make_entry(\"/dev/dri\", options=\"bind,create=dir,optional 0 0\", check=False)')
+# Cleanly remove GPU nodes if previously added
+c = c.replace('make_entry(\"/dev/ion\")\n    ', '')
+c = c.replace('make_entry(\"/dev/kgsl-3d0\")\n    ', '')
+c = c.replace('make_entry(\"/dev/dri\", options=\"bind,create=dir,optional 0 0\", check=False)\n    ', '')
+c = c.replace('render, _ = tools.helpers.gpu.getDriNode(args)', 'render, _ = \"\", \"\"')
+c = c.replace('make_entry(\"/sys/kernel/debug\", options=\"rbind,create=dir,optional 0 0\")', 'pass')
 
 # Disable copying consumerir permissions
-c = c.replace('copy_list.append(\"/vendor/etc/permissions/android.hardware.consumerir.xml\")', '# consumerir disabled')
+c = c.replace('copy_list.append(\"/vendor/etc/permissions/android.hardware.consumerir.xml\")', 'pass')
+c = c.replace('copy_list.append(\"/odm/etc/permissions/android.hardware.consumerir.xml\")', 'pass')
 
 # Redirect lxc log to persistent /var/log/waydroid_lxc.log
 c = c.replace('/tmp/waydroid_lxc.log', '/var/log/waydroid_lxc.log')
@@ -101,18 +132,55 @@ if [ -f "$LXC_CFG" ]; then
     fi
     # Ensure valid LXC 5.x mount syntax
     sed -i 's/sys:ro:rslave/sys:ro/' "$LXC_CFG" 2>/dev/null || true
-    # Ensure console path is none
-    if ! grep -q "lxc.console.path" "$LXC_CFG"; then
-        echo "lxc.console.path = none" >> "$LXC_CFG"
-    fi
-    # Allow GPU major devices (226 for DRM, 235 for KGSL Adreno 620)
-    if ! grep -q "c 235:\* rwm" "$LXC_CFG"; then
-        sed -i '/c 504:\* rwm/a lxc.cgroup2.devices.allow = c 226:* rwm\nlxc.cgroup2.devices.allow = c 235:* rwm' "$LXC_CFG" 2>/dev/null || true
-    fi
+    # Ensure console logfile is persistent
+    sed -i 's|/tmp/init_console.log|/var/log/init_console.log|' "$LXC_CFG" 2>/dev/null || true
+    # Remove any GPU major device rules
+    sed -i '/c 226:\* rwm/d; /c 235:\* rwm/d' "$LXC_CFG" 2>/dev/null || true
 fi
-if [ -f /usr/lib/waydroid/data/configs/config_base ] && ! grep -q "c 235:\* rwm" /usr/lib/waydroid/data/configs/config_base; then
-    sed -i '/c 504:\* rwm/a lxc.cgroup2.devices.allow = c 226:* rwm\nlxc.cgroup2.devices.allow = c 235:* rwm' /usr/lib/waydroid/data/configs/config_base 2>/dev/null || true
+if [ -f /usr/lib/waydroid/data/configs/config_base ]; then
+    sed -i '/c 226:\* rwm/d; /c 235:\* rwm/d' /usr/lib/waydroid/data/configs/config_base 2>/dev/null || true
 fi
+
+# Create isolated container null device to protect host /dev/null from Android chmod
+[ ! -e /var/lib/waydroid/dev_null ] && mknod -m 666 /var/lib/waydroid/dev_null c 1 3 || chmod 666 /var/lib/waydroid/dev_null
+chmod 666 /dev/null 2>/dev/null || true
+
+# Ensure complete and safe config_nodes on disk
+cat << 'EOF' > /var/lib/waydroid/lxc/waydroid/config_nodes
+lxc.mount.entry = tmpfs dev tmpfs nosuid 0 0
+lxc.mount.entry = /dev/zero dev/zero none bind,create=file,optional 0 0
+lxc.mount.entry = /var/lib/waydroid/dev_null dev/null none bind,create=file,optional 0 0
+lxc.mount.entry = /dev/full dev/full none bind,create=file,optional 0 0
+lxc.mount.entry = /dev/urandom dev/urandom none bind,create=file,optional 0 0
+lxc.mount.entry = /dev/random dev/random none bind,create=file,optional 0 0
+lxc.mount.entry = /dev/ashmem dev/ashmem none bind,create=file,optional 0 0
+lxc.mount.entry = /dev/fuse dev/fuse none bind,create=file,optional 0 0
+lxc.mount.entry = /dev/tty dev/tty none bind,create=file,optional 0 0
+lxc.mount.entry = /dev/kmsg dev/kmsg none bind,create=file,optional 0 0
+lxc.mount.entry = /dev/null proc/sysrq-trigger none bind,optional 0 0
+lxc.mount.entry = /dev/null sys/power/state none bind,optional 0 0
+lxc.mount.entry = /dev/null sys/power/wake_lock none bind,optional 0 0
+lxc.mount.entry = /dev/null sys/power/wake_unlock none bind,optional 0 0
+lxc.mount.entry = tmpfs sys/kernel/debug tmpfs nosuid,nodev,noexec 0 0
+lxc.mount.entry = tmpfs sys/kernel/tracing tmpfs nosuid,nodev,noexec 0 0
+lxc.mount.entry = tmpfs sys/class/android_usb tmpfs nosuid,nodev,noexec 0 0
+lxc.mount.entry = tmpfs sys/class/power_supply tmpfs nosuid,nodev,noexec 0 0
+lxc.mount.entry = tmpfs sys/power tmpfs nosuid,nodev,noexec 0 0
+lxc.mount.entry = /var/lib/waydroid/fake_filesystems proc/filesystems none bind,create=file 0 0
+lxc.mount.entry = /dev/anbox-binder dev/binder none bind,create=file,optional 0 0
+lxc.mount.entry = /dev/anbox-vndbinder dev/vndbinder none bind,create=file,optional 0 0
+lxc.mount.entry = /dev/anbox-hwbinder dev/hwbinder none bind,create=file,optional 0 0
+lxc.mount.entry = /dev/hwbinder dev/host_hwbinder none bind,create=file,optional 0 0
+lxc.mount.entry = /vendor vendor_extra none rbind,optional 0 0
+lxc.mount.entry = none dev/pts devpts defaults,mode=644,ptmxmode=666,create=dir 0 0
+lxc.mount.entry = /dev/uhid dev/uhid none bind,create=file,optional 0 0
+lxc.mount.entry = /dev/net/tun dev/tun none bind,create=file,optional 0 0
+lxc.mount.entry = /var/lib/waydroid/host-permissions vendor/etc/host-permissions none bind,optional 0 0
+lxc.mount.entry = tmpfs mnt_extra tmpfs nodev 0 0
+lxc.mount.entry = tmpfs tmp tmpfs nodev 0 0
+lxc.mount.entry = tmpfs var tmpfs nodev 0 0
+lxc.mount.entry = tmpfs run tmpfs nodev 0 0
+EOF
 
 # 4. Waydroid config and properties
 if [ -f /var/lib/waydroid/waydroid.cfg ]; then
@@ -134,10 +202,12 @@ cfg['properties']['persist.sys.usb.config'] = 'none'
 cfg['properties']['sys.usb.config'] = 'none'
 cfg['properties']['ro.hardware.egl'] = 'swiftshader'
 cfg['properties']['ro.hardware.gralloc'] = 'default'
+cfg['properties']['ro.hardware.hwcomposer'] = 'waydroid'
 cfg['properties']['persist.waydroid.multi_windows'] = 'true'
 with open('/var/lib/waydroid/waydroid.cfg', 'w') as f:
     cfg.write(f)
 " 2>/dev/null || true
+fi
 if [ -f /var/lib/waydroid/waydroid.prop ]; then
     sed -i 's/^ro.hardware.egl=.*/ro.hardware.egl=swiftshader/' /var/lib/waydroid/waydroid.prop
     sed -i 's/^ro.hardware.gralloc=.*/ro.hardware.gralloc=default/' /var/lib/waydroid/waydroid.prop
@@ -151,5 +221,25 @@ on early-init
     setrlimit 4 0 0
 EOF
 
+# 6. Neutralize cgroup2 freezer in cgroups.json to prevent kernel 4.19 IO error on +freezer
+python3 -c "
+import json, os, subprocess
+tmp_mnt = '/tmp/waydroid_sys_tmp'
+os.makedirs(tmp_mnt, exist_ok=True)
+if os.path.exists('/usr/share/waydroid-extra/images/system.img') and not os.path.exists('$OVERLAY_SYS/../cgroups.json'):
+    try:
+        subprocess.run(['mount', '-o', 'ro', '/usr/share/waydroid-extra/images/system.img', tmp_mnt], check=True)
+        with open(tmp_mnt + '/system/etc/cgroups.json', 'r') as f:
+            data = json.load(f)
+        subprocess.run(['umount', tmp_mnt], check=True)
+        if 'Cgroups2' in data and 'Controllers' in data['Cgroups2']:
+            data['Cgroups2']['Controllers'] = []
+        with open('$OVERLAY_SYS/../cgroups.json', 'w') as f:
+            json.dump(data, f, indent=2)
+    except Exception:
+        subprocess.run(['umount', tmp_mnt], stderr=subprocess.DEVNULL)
+" 2>/dev/null || true
+
 echo "[✓] Waydroid platform integration applied successfully."
 exit 0
+

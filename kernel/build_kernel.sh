@@ -65,8 +65,10 @@ make O=out_halium ARCH=arm64 $CCENV \
   CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
   PYTHON=python2 INSTALL_MOD_PATH="$K/out_modules" INSTALL_MOD_STRIP=1 modules_install
 REL="$(cat out_halium/include/config/kernel.release)"
-mkdir -p "$ROOT/output"
-tar czf "$ROOT/output/kernel-modules-$REL.tar.gz" -C "$K/out_modules" lib
+mkdir -p "$K/out_modules_usr/usr"
+rm -rf "$K/out_modules_usr/usr/lib"
+mv "$K/out_modules/lib" "$K/out_modules_usr/usr/"
+tar czf "$ROOT/output/kernel-modules-$REL.tar.gz" -C "$K/out_modules_usr" usr
 echo "modules tarball: $ROOT/output/kernel-modules-$REL.tar.gz"
 echo "device: tar xzf kernel-modules-$REL.tar.gz -C / && depmod -a $REL"
 cat out_halium/include/config/kernel.release
