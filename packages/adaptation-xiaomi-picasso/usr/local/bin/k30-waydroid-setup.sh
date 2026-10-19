@@ -140,6 +140,29 @@ with open('$LXC_PY', 'w') as f:
 " 2>/dev/null || true
 fi
 
+# Ensure Waydroid and Android app desktop entries are visible in app launcher
+UM_PY="/usr/lib/waydroid/tools/services/user_manager.py"
+if [ -f "$UM_PY" ]; then
+    python3 -c "
+with open('$UM_PY', 'r') as f:
+    c = f.read()
+c = c.replace('NoDisplay=true', 'NoDisplay=false')
+c = c.replace('NoDisplay={str(hide).lower()}', 'NoDisplay=false')
+with open('$UM_PY', 'w') as f:
+    f.write(c)
+" 2>/dev/null || true
+fi
+
+for d in /home/*/.local/share/applications; do
+    if [ -d "$d" ]; then
+        sed -i 's/NoDisplay=true/NoDisplay=false/' "$d"/Waydroid.desktop 2>/dev/null || true
+        sed -i 's/NoDisplay=true/NoDisplay=false/' "$d"/waydroid.org.lineageos.jelly.desktop 2>/dev/null || true
+        sed -i 's/^Name=Browser$/Name=Android Browser/' "$d"/waydroid.org.lineageos.jelly.desktop 2>/dev/null || true
+        sed -i 's/Categories=X-WayDroid-App;/Categories=Network;WebBrowser;X-WayDroid-App;/' "$d"/waydroid.org.lineageos.jelly.desktop 2>/dev/null || true
+        update-desktop-database "$d" 2>/dev/null || true
+    fi
+done
+
 # 3. Apply LXC config adjustments for clean Android init execution
 LXC_CFG="/var/lib/waydroid/lxc/waydroid/config"
 if [ -f "$LXC_CFG" ]; then
