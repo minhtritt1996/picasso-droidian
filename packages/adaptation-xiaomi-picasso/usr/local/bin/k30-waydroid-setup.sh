@@ -47,6 +47,18 @@ done
 echo '# Disabled for waydroid' > "$OVERLAY_VENDOR_INIT/android.hardware.camera.provider@2.4-service.rc"
 # Ensure OMX and Codec2 hardware video services remain active for VPU acceleration
 [ -f "$OVERLAY_VENDOR_INIT/android.hardware.media.omx@1.0-service.rc" ] && rm -f "$OVERLAY_VENDOR_INIT/android.hardware.media.omx@1.0-service.rc"
+# Ensure Android STREAM_MUSIC volume defaults to 15 (max) on boot
+cat << 'EOF' > "$OVERLAY_VENDOR_INIT/waydroid_audio.rc"
+service waydroid_audio_init /system/bin/cmd media_session volume --stream 3 --set 15
+    user system
+    group system
+    oneshot
+    disabled
+
+on property:sys.boot_completed=1
+    start waydroid_audio_init
+EOF
+chmod 644 "$OVERLAY_VENDOR_INIT/waydroid_audio.rc"
 
 if [ -f "$OVERLAY_SYS/hw/init.rc" ]; then
     sed -i 's|^[[:space:]]*import /vendor/etc/init/hw/init\.\${ro\.hardware}\.rc|# import /vendor/etc/init/hw/init.\${ro.hardware}.rc|' "$OVERLAY_SYS/hw/init.rc"

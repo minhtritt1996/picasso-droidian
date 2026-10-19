@@ -40,6 +40,9 @@ for user_runtime in /run/user/*; do
             if [ "$fbd_prof" = "'silent'" ]; then
                 su - "$user_name" -c "XDG_RUNTIME_DIR=$user_runtime gsettings set org.sigxcpu.feedbackd profile 'full'" 2>/dev/null || true
             fi
+            # Ensure primary and deep_buffer sinks are initialized to 100% volume
+            su - "$user_name" -c "XDG_RUNTIME_DIR=$user_runtime pactl set-sink-volume sink.primary_output 100%" 2>/dev/null || true
+            su - "$user_name" -c "XDG_RUNTIME_DIR=$user_runtime pactl set-sink-volume sink.deep_buffer 100%" 2>/dev/null || true
         fi
     fi
 done
