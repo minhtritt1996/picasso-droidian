@@ -138,9 +138,6 @@ ApplicationWindow {
     MediaPlayer {
         id: camGst
         autoPlay: true
-        source: isFront || !("back" in backends[backendId])
-            ? backends[backendId].front
-            : backends[backendId].back
         videoOutput: viewfinder
         property var backendId: 0
         property string outputPath: StandardPaths.writableLocation(StandardPaths.MoviesLocation).toString().replace("file://","") +
@@ -148,44 +145,38 @@ ApplicationWindow {
 
         Component.onCompleted: {
             fileManager.createDirectory("/Videos/droidian-camera");
+            updateSource();
         }
-
-        property var backends: [
-            {
-                front: "gst-pipeline: droidcamsrc mode=2 camera-device=1 ! video/x-raw ! queue ! videoconvert ! videoflip video-direction=auto ! queue ! qtvideosink",
-                frontRecord: "gst-pipeline: droidcamsrc camera-device=1 mode=2 ! tee name=t t. ! queue ! video/x-raw, width=1920, height=1080 ! queue ! videoconvert ! videoflip video-direction=auto ! queue ! qtvideosink t. ! queue ! video/x-raw, width=1920, height=1080 ! videoconvert ! videoflip video-direction=auto ! jpegenc ! mkv. autoaudiosrc ! queue ! audioconvert ! voaacenc ! mkv. matroskamux name=mkv ! filesink location=" + outputPath,
-                back: "gst-pipeline: droidcamsrc mode=2 camera-device=" + currentBackCamera + " ! video/x-raw ! queue ! videoconvert ! videoflip video-direction=auto ! queue ! qtvideosink",
-                backRecord: "gst-pipeline: droidcamsrc camera-device=" + currentBackCamera + " mode=2 ! tee name=t t. ! queue ! video/x-raw, width=1920, height=1080 ! queue ! videoconvert ! videoflip video-direction=auto ! queue ! qtvideosink t. ! queue ! video/x-raw, width=1920, height=1080 ! videoconvert ! videoflip video-direction=auto ! jpegenc ! mkv. autoaudiosrc ! queue ! audioconvert ! voaacenc ! mkv. matroskamux name=mkv ! filesink location=" + outputPath
-            }
-        ]
 
         property bool isFront: false
         property bool recording: false
 
-        function updateSource() {
-            var newSource = recording ? 
-                (isFront ? backends[backendId].frontRecord : backends[backendId].backRecord) : 
-                (isFront ? backends[backendId].front : backends[backendId].back);
-
-            if (source !== newSource) {
-                stop();
-                camSwitchTimer.targetSource = newSource;
-                camSwitchTimer.restart();
+        function getDesiredSource() {
+            var camDev = isFront ? 1 : currentBackCamera;
+            if (recording) {
+                return "gst-pipeline: droidcamsrc camera-device=" + camDev + " mode=2 ! tee name=t t. ! queue max-size-buffers=1 max-size-bytes=0 max-size-time=0 leaky=2 ! video/x-raw, width=1920, height=1080 ! queue max-size-buffers=1 max-size-bytes=0 max-size-time=0 leaky=2 ! videoconvert ! videoflip video-direction=auto ! video/x-raw,format=BGRx ! queue max-size-buffers=1 max-size-bytes=0 max-size-time=0 leaky=2 ! qtvideosink t. ! queue ! video/x-raw, width=1920, height=1080 ! videoconvert ! videoflip video-direction=auto ! jpegenc ! mkv. autoaudiosrc ! queue ! audioconvert ! voaacenc ! mkv. matroskamux name=mkv ! filesink location=" + outputPath;
+            } else {
+                return "gst-pipeline: droidcamsrc mode=2 camera-device=" + camDev + " ! video/x-raw ! queue max-size-buffers=1 max-size-bytes=0 max-size-time=0 leaky=2 ! videoflip video-direction=auto ! videoconvert ! video/x-raw,format=BGRx ! queue max-size-buffers=1 max-size-bytes=0 max-size-time=0 leaky=2 ! qtvideosink";
             }
+        }
 
+        function updateSource() {
+            var newSource = getDesiredSource();
+            stop();
+            source = "";
+            camSwitchTimer.targetSource = newSource;
+            camSwitchTimer.restart();
             window.videoCaptured = recording;
         }
 
         onError: {
-            if (backendId + 1 in backends) {
-                backendId++;
-            }
+            console.log("camGst error:", error, errorString);
         }
     }
 
     Timer {
         id: camSwitchTimer
-        interval: 200
+        interval: 350
         repeat: false
         property string targetSource: ""
         onTriggered: {
