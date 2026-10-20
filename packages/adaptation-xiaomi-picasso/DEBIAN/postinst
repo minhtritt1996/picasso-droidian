@@ -94,10 +94,14 @@ fi
 chmod 0666 /sys/class/backlight/*/brightness 2>/dev/null || true
 chmod 0666 /sys/class/leds/flashlight/brightness 2>/dev/null || true
 
-# Remove legacy status bar CSS override that breaks vertical alignment
-for udir in /etc/skel /home/droidian; do
-    rm -f "$udir/.config/gtk-3.0/gtk.css" 2>/dev/null || true
-done
+# Initialize and sync GTK CSS status bar geometry
+mkdir -p /home/droidian/.config/gtk-3.0 /etc/skel/.config/gtk-3.0 /etc/xdg/gtk-3.0
+if [ -f /etc/xdg/gtk-3.0/gtk.css ]; then
+    cp -a /etc/xdg/gtk-3.0/gtk.css /home/droidian/.config/gtk-3.0/gtk.css 2>/dev/null || true
+    cp -a /etc/xdg/gtk-3.0/gtk.css /etc/skel/.config/gtk-3.0/gtk.css 2>/dev/null || true
+fi
+chown -R droidian:droidian /home/droidian/.config/gtk-3.0 2>/dev/null || true
+/usr/local/bin/k30-state-manager restore 2>/dev/null || true
 
 # Remove Refresh Rate desktop shortcut (integrated into GNOME Display settings)
 rm -f /usr/share/applications/k30-refreshrate.desktop /home/droidian/.local/share/applications/k30-refreshrate.desktop 2>/dev/null || true

@@ -1,11 +1,61 @@
 #!/bin/bash
-# K30 5G Brightness & Volume State Persistence Manager
+# K30 5G Brightness, Volume & Display Scale Persistence Manager
 
 STATE_DIR="/var/lib/droidian"
 STATE_FILE="$STATE_DIR/k30-hardware-state.conf"
 mkdir -p "$STATE_DIR"
 
 PULSE_SOCKET="unix:/run/user/32011/pulse/native"
+
+sync_display_scale_and_css() {
+    local CURR_SCALE CURR_SCALE_FMT H_LOGICAL MB_LOGICAL PR_LOGICAL
+    CURR_SCALE=$(XDG_RUNTIME_DIR=/run/user/32011 WAYLAND_DISPLAY=wayland-0 wlr-randr 2>/dev/null | grep 'Scale:' | head -1 | awk '{print $2}')
+    if [ -z "$CURR_SCALE" ]; then
+        CURR_SCALE=$(grep '^scale =' /etc/phosh/phoc.ini 2>/dev/null | head -1 | awk '{print $3}')
+    fi
+    [ -z "$CURR_SCALE" ] && CURR_SCALE=2.5
+
+    CURR_SCALE_FMT=$(echo "$CURR_SCALE" | sed -E 's/\.0+$//')
+
+    # 1. Ensure phoc.ini is kept updated
+    if [ -f /etc/phosh/phoc.ini ] && ! grep -q "^scale = $CURR_SCALE_FMT" /etc/phosh/phoc.ini; then
+        sed -i "s/^scale = .*/scale = $CURR_SCALE_FMT/" /etc/phosh/phoc.ini 2>/dev/null || true
+    fi
+
+    # 2. Lock physical status bar dimensions:
+    # Target physical height = 95px (exact dual camera bottom edge)
+    # Target physical bottom margin shift = 40px (exact 50/50 vertical centering)
+    # Target physical right padding = 230px (clears 236px punch-hole camera cluster)
+    H_LOGICAL=$(awk "BEGIN { printf \"%d\", (95 / $CURR_SCALE) + 0.5 }")
+    MB_LOGICAL=$(awk "BEGIN { printf \"%d\", (40 / $CURR_SCALE) + 0.5 }")
+    PR_LOGICAL=$(awk "BEGIN { printf \"%d\", (230 / $CURR_SCALE) + 0.5 }")
+
+    local CSS_USER="/home/droidian/.config/gtk-3.0/gtk.css"
+    local CSS_SYSTEM="/etc/xdg/gtk-3.0/gtk.css"
+
+    if ! grep -q "min-height: ${H_LOGICAL}px" "$CSS_USER" 2>/dev/null || \
+       ! grep -q "margin-bottom: ${MB_LOGICAL}px" "$CSS_USER" 2>/dev/null || \
+       ! grep -q "padding-right: ${PR_LOGICAL}px" "$CSS_USER" 2>/dev/null; then
+        mkdir -p "/home/droidian/.config/gtk-3.0" "/etc/xdg/gtk-3.0"
+        cat << CSS_EOF > "$CSS_USER"
+#top-bar {
+  min-height: ${H_LOGICAL}px;
+  padding-top: 0px;
+  padding-bottom: 0px;
+  margin-bottom: ${MB_LOGICAL}px;
+}
+
+phosh-top-panel .indicators {
+  padding-right: ${PR_LOGICAL}px;
+}
+CSS_EOF
+        cp "$CSS_USER" "$CSS_SYSTEM" 2>/dev/null || true
+        chown -R droidian:droidian "/home/droidian/.config/gtk-3.0" 2>/dev/null || true
+        if pgrep -x phosh >/dev/null 2>&1; then
+            XDG_RUNTIME_DIR=/run/user/32011 systemctl --user restart mobi.phosh.Shell.service 2>/dev/null || true
+        fi
+    fi
+}
 
 save_state() {
     local B VOL
@@ -23,15 +73,8 @@ save_state() {
         echo "SAVED_VOLUME=$VOL" >> "$STATE_FILE.tmp"
     fi
 
-    # 3. Save / Sync Display Scale to /etc/phosh/phoc.ini
-    local CURR_SCALE
-    CURR_SCALE=$(XDG_RUNTIME_DIR=/run/user/32011 WAYLAND_DISPLAY=wayland-0 wlr-randr 2>/dev/null | grep 'Scale:' | head -1 | awk '{print $2}')
-    if [ -n "$CURR_SCALE" ]; then
-        CURR_SCALE=$(echo "$CURR_SCALE" | sed -E 's/\.0+$//')
-        if [ -f /etc/phosh/phoc.ini ] && ! grep -q "^scale = $CURR_SCALE" /etc/phosh/phoc.ini; then
-            sed -i "s/^scale = .*/scale = $CURR_SCALE/" /etc/phosh/phoc.ini 2>/dev/null || true
-        fi
-    fi
+    # 3. Display Scale & Status Bar CSS Synchronization
+    sync_display_scale_and_css
 
     if [ -f "$STATE_FILE.tmp" ]; then
         mv "$STATE_FILE.tmp" "$STATE_FILE"
@@ -55,12 +98,15 @@ restore_state() {
         PULSE_SERVER="$PULSE_SOCKET" pactl set-sink-volume 0 "${SAVED_VOLUME}%" 2>/dev/null || true
         PULSE_SERVER="$PULSE_SOCKET" pactl set-sink-volume 1 "${SAVED_VOLUME}%" 2>/dev/null || true
     fi
+
+    # Restore Display Scale & Status Bar CSS
+    sync_display_scale_and_css
 }
 
 daemon_loop() {
     while true; do
         save_state
-        sleep 15
+        sleep 10
     done
 }
 

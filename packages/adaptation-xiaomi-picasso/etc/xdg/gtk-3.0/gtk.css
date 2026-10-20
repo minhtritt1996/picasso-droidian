@@ -1,8 +1,8 @@
 #top-bar {
-  min-height: 32px;
+  min-height: 38px;
   padding-top: 0px;
   padding-bottom: 0px;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
 }
 
 phosh-top-panel .indicators {
