@@ -96,12 +96,14 @@ chmod 0666 /sys/class/leds/flashlight/brightness 2>/dev/null || true
 
 # Remove legacy status bar CSS override that breaks vertical alignment
 for udir in /etc/skel /home/droidian; do
-    if [ -f "$udir/.config/gtk-3.0/gtk.css" ]; then
-        if grep -qs "picasso" "$udir/.config/gtk-3.0/gtk.css"; then
-            rm -f "$udir/.config/gtk-3.0/gtk.css"
-        fi
-    fi
+    rm -f "$udir/.config/gtk-3.0/gtk.css" 2>/dev/null || true
 done
+
+# Remove Refresh Rate desktop shortcut (integrated into GNOME Display settings)
+rm -f /usr/share/applications/k30-refreshrate.desktop /home/droidian/.local/share/applications/k30-refreshrate.desktop 2>/dev/null || true
+if command -v update-desktop-database >/dev/null 2>&1; then
+    update-desktop-database -q /usr/share/applications 2>/dev/null || true
+fi
 
 # PulseAudio sound configuration: use native module-droid-card (HIDL Audio HAL)
 rm -f /etc/pulse/arm_droid_card_custom.pa /etc/pulse/arm_droid_card_custom.pa.* 2>/dev/null || true

@@ -19,6 +19,11 @@ on boot
     enable vendor.qti-chg-policy-sh
     start vendor.qti-chg-policy-sh
 
+on charger
+    setprop sys.boot_from_charger_mode 1
+    class_stop charger
+    trigger late-init
+
 on property:persist.vendor.hvdcp_opti.start=2
     rmdir /mnt/vendor/persist/hvdcp_opti
     setprop persist.vendor.hvdcp_opti.start 0

@@ -23,6 +23,16 @@ save_state() {
         echo "SAVED_VOLUME=$VOL" >> "$STATE_FILE.tmp"
     fi
 
+    # 3. Save / Sync Display Scale to /etc/phosh/phoc.ini
+    local CURR_SCALE
+    CURR_SCALE=$(XDG_RUNTIME_DIR=/run/user/32011 WAYLAND_DISPLAY=wayland-0 wlr-randr 2>/dev/null | grep 'Scale:' | head -1 | awk '{print $2}')
+    if [ -n "$CURR_SCALE" ]; then
+        CURR_SCALE=$(echo "$CURR_SCALE" | sed -E 's/\.0+$//')
+        if [ -f /etc/phosh/phoc.ini ] && ! grep -q "^scale = $CURR_SCALE" /etc/phosh/phoc.ini; then
+            sed -i "s/^scale = .*/scale = $CURR_SCALE/" /etc/phosh/phoc.ini 2>/dev/null || true
+        fi
+    fi
+
     if [ -f "$STATE_FILE.tmp" ]; then
         mv "$STATE_FILE.tmp" "$STATE_FILE"
         chmod 644 "$STATE_FILE"

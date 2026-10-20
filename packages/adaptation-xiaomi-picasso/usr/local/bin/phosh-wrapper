@@ -21,6 +21,6 @@ systemctl --user import-environment $VARS
 dbus-update-activation-environment --systemd $VARS 2>/dev/null || true
 
 # Restart portal services so they pick up WAYLAND_DISPLAY immediately
-systemctl --user restart xdg-desktop-portal-gtk 2>/dev/null || true
-systemctl --user restart xdg-desktop-portal 2>/dev/null || true
+systemctl --user restart --no-block xdg-desktop-portal-gtk 2>/dev/null || true
+systemctl --user restart --no-block xdg-desktop-portal 2>/dev/null || true
 exec gnome-session --session=phosh
