@@ -65,9 +65,6 @@ phosh-top-panel .indicators {
 CSS_EOF
         cp "$CSS_USER" "$CSS_SYSTEM" 2>/dev/null || true
         chown -R droidian:droidian "/home/droidian/.config/gtk-3.0" 2>/dev/null || true
-        if pgrep -x phosh >/dev/null 2>&1; then
-            XDG_RUNTIME_DIR=/run/user/32011 systemctl --user restart mobi.phosh.Shell.service 2>/dev/null || true
-        fi
     fi
 }
 

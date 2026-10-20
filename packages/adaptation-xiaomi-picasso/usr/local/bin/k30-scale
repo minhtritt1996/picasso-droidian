@@ -1,0 +1,36 @@
+#!/bin/bash
+# K30 5G Display Scale Switcher (200% / 250%)
+set -e
+
+if [ "$(id -u)" -ne 0 ]; then
+    echo "This script must be run as root: sudo k30-scale {200|250}"
+    exit 1
+fi
+
+NEW_SCALE="$1"
+case "$NEW_SCALE" in
+    200|2|2.0)
+        SCALE_VAL="2.0"
+        ;;
+    250|2.5)
+        SCALE_VAL="2.5"
+        ;;
+    *)
+        echo "Usage: sudo k30-scale {200|250}"
+        echo "Supported scales:"
+        echo "  sudo k30-scale 200  (Set display scale to 200%)"
+        echo "  sudo k30-scale 250  (Set display scale to 250%)"
+        exit 1
+        ;;
+esac
+
+echo "[+] Setting display scale to $SCALE_VAL in /etc/phosh/phoc.ini..."
+sed -i "s/^scale = .*/scale = $SCALE_VAL/" /etc/phosh/phoc.ini
+
+echo "[+] Synchronizing GTK CSS for status bar geometry..."
+/usr/local/bin/k30-state-manager restore
+
+echo "[+] Restarting phosh.service to apply new scale..."
+systemctl restart phosh.service
+
+echo "[✓] Display scale set to $SCALE_VAL successfully!"
