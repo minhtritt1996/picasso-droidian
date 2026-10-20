@@ -94,48 +94,11 @@ fi
 chmod 0666 /sys/class/backlight/*/brightness 2>/dev/null || true
 chmod 0666 /sys/class/leds/flashlight/brightness 2>/dev/null || true
 
-# Configure status bar safezone for Xiaomi Redmi K30 5G dual punch-hole
+# Remove legacy status bar CSS override that breaks vertical alignment
 for udir in /etc/skel /home/droidian; do
-    if [ -d "$udir" ]; then
-        mkdir -p "$udir/.config/gtk-3.0"
-        cat << 'EOF' > "$udir/.config/gtk-3.0/gtk.css"
-/* Xiaomi Redmi K30 5G (picasso) Status Bar & Notch Safezone */
-phosh-top-panel {
-  min-height: 54px;
-}
-
-phosh-top-panel-bg {
-  min-height: 54px;
-}
-
-#top-bar-bin {
-  min-height: 54px;
-}
-
-#top-bar {
-  min-height: 54px;
-}
-
-#top-bar > widget,
-#top-bar > label,
-#top-bar > box,
-#box_network,
-#lbl_clock,
-#box_indicators {
-  margin-top: 15px;
-  margin-bottom: 7px;
-}
-
-#box_network {
-  padding-left: 12px;
-}
-
-#box_indicators {
-  padding-right: 135px;
-}
-EOF
-        if [ "$udir" = "/home/droidian" ]; then
-            chown -R droidian:droidian /home/droidian/.config 2>/dev/null || true
+    if [ -f "$udir/.config/gtk-3.0/gtk.css" ]; then
+        if grep -qs "picasso" "$udir/.config/gtk-3.0/gtk.css"; then
+            rm -f "$udir/.config/gtk-3.0/gtk.css"
         fi
     fi
 done

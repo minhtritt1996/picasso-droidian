@@ -1,1 +1,30 @@
-# Disabled charger monitor to prevent mount_all and mount_userdata_failed in off-mode charging
+# Copyright (c) 2019-2020, Qualcomm Technologies, Inc.
+# All Rights Reserved.
+# Confidential and Proprietary - Qualcomm Technologies, Inc.
+
+service vendor.hvdcp_opti /vendor/bin/hvdcp_opti
+    class main
+    user system
+    group system wakelock
+    capabilities BLOCK_SUSPEND WAKE_ALARM
+    disabled
+
+service vendor.qti-chg-policy-sh /vendor/bin/init.qti.chg_policy.sh
+    class core
+    user root
+    oneshot
+    disabled
+
+on boot
+    enable vendor.qti-chg-policy-sh
+    start vendor.qti-chg-policy-sh
+
+on property:persist.vendor.hvdcp_opti.start=2
+    rmdir /mnt/vendor/persist/hvdcp_opti
+    setprop persist.vendor.hvdcp_opti.start 0
+
+on property:persist.vendor.hvdcp_opti.start=1
+    mkdir /mnt/vendor/persist/hvdcp_opti 0770 root system
+    enable vendor.hvdcp_opti
+    start vendor.hvdcp_opti
+    setprop persist.vendor.hvdcp_opti.start 0
