@@ -169,8 +169,8 @@ ApplicationWindow {
 
             if (source !== newSource) {
                 stop();
-                source = newSource;
-                play();
+                camSwitchTimer.targetSource = newSource;
+                camSwitchTimer.restart();
             }
 
             window.videoCaptured = recording;
@@ -179,6 +179,19 @@ ApplicationWindow {
         onError: {
             if (backendId + 1 in backends) {
                 backendId++;
+            }
+        }
+    }
+
+    Timer {
+        id: camSwitchTimer
+        interval: 200
+        repeat: false
+        property string targetSource: ""
+        onTriggered: {
+            if (targetSource !== "") {
+                camGst.source = targetSource;
+                camGst.play();
             }
         }
     }
@@ -450,9 +463,8 @@ ApplicationWindow {
                     Layout.alignment: Qt.AlignHCenter
                     Layout.preferredWidth: parent.width * 0.9
                     Button {
-                        property string pos: model.position === "BackFace" ? "Back" : "Front"
                         Layout.alignment: Qt.AlignLeft
-                        visible: parent.visible
+                        visible: parent.visible && model.position === "BackFace"
                         icon.name: "camera-video-symbolic"
                         icon.color: "white"
                         icon.width: 48
@@ -461,7 +473,9 @@ ApplicationWindow {
 
                         font.pixelSize: 32
                         font.bold: true
-                        text: " " + model.index + " " + pos
+                        text: model.index === 0 ? " Main (64 MP)" :
+                              (model.index === 2 ? " Ultra-Wide (8 MP)" :
+                              (model.index === 3 ? " Macro (2 MP)" : " Camera " + model.index))
 
                         background: Rectangle {
                             anchors.fill: parent
@@ -470,7 +484,11 @@ ApplicationWindow {
 
                         onClicked: {
                             window.blurView = 0
-                            window.currentBackCamera = model.index
+                            if (window.currentBackCamera !== model.index || camGst.isFront) {
+                                window.currentBackCamera = model.index
+                                camGst.isFront = false
+                                camGst.updateSource()
+                            }
                             optionContainer.state = "closed"
                         }
                     }
