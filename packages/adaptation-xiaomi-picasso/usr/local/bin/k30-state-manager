@@ -8,7 +8,7 @@ mkdir -p "$STATE_DIR"
 PULSE_SOCKET="unix:/run/user/32011/pulse/native"
 
 sync_display_scale_and_css() {
-    local CURR_SCALE CURR_SCALE_FMT H_LOGICAL MB_LOGICAL PR_LOGICAL
+    local CURR_SCALE CURR_SCALE_FMT H_LOGICAL LBL_MT IMG_MT PR_LOGICAL
     CURR_SCALE=$(XDG_RUNTIME_DIR=/run/user/32011 WAYLAND_DISPLAY=wayland-0 wlr-randr 2>/dev/null | grep 'Scale:' | head -1 | awk '{print $2}')
     if [ -z "$CURR_SCALE" ]; then
         CURR_SCALE=$(grep '^scale =' /etc/phosh/phoc.ini 2>/dev/null | head -1 | awk '{print $3}')
@@ -24,28 +24,42 @@ sync_display_scale_and_css() {
 
     # 2. Lock physical status bar dimensions:
     # Target physical height = 95px (exact dual camera bottom edge)
-    # Target physical bottom margin shift = 40px (exact 50/50 vertical centering)
+    # NO margin-bottom on #top-bar (prevents any dead gap underneath)
+    # Internal negative margin-top centers clock label and indicator images perfectly
     # Target physical right padding = 230px (clears 236px punch-hole camera cluster)
     H_LOGICAL=$(awk "BEGIN { printf \"%d\", (95 / $CURR_SCALE) + 0.5 }")
-    MB_LOGICAL=$(awk "BEGIN { printf \"%d\", (40 / $CURR_SCALE) + 0.5 }")
+    LBL_MT=$(awk "BEGIN { printf \"%d\", (-24 / $CURR_SCALE) - 0.5 }")
+    IMG_MT=$(awk "BEGIN { printf \"%d\", (-18 / $CURR_SCALE) - 0.5 }")
     PR_LOGICAL=$(awk "BEGIN { printf \"%d\", (230 / $CURR_SCALE) + 0.5 }")
 
     local CSS_USER="/home/droidian/.config/gtk-3.0/gtk.css"
     local CSS_SYSTEM="/etc/xdg/gtk-3.0/gtk.css"
 
     if ! grep -q "min-height: ${H_LOGICAL}px" "$CSS_USER" 2>/dev/null || \
-       ! grep -q "margin-bottom: ${MB_LOGICAL}px" "$CSS_USER" 2>/dev/null || \
+       ! grep -q "margin-top: ${LBL_MT}px" "$CSS_USER" 2>/dev/null || \
+       ! grep -q "margin-top: ${IMG_MT}px" "$CSS_USER" 2>/dev/null || \
        ! grep -q "padding-right: ${PR_LOGICAL}px" "$CSS_USER" 2>/dev/null; then
         mkdir -p "/home/droidian/.config/gtk-3.0" "/etc/xdg/gtk-3.0"
         cat << CSS_EOF > "$CSS_USER"
 #top-bar {
   min-height: ${H_LOGICAL}px;
-  padding-top: 0px;
-  padding-bottom: 0px;
-  margin-bottom: ${MB_LOGICAL}px;
+  padding: 0px;
+  margin: 0px;
+}
+
+#top-bar label {
+  margin-top: ${LBL_MT}px;
+  margin-bottom: 0px;
+}
+
+#top-bar image {
+  margin-top: ${IMG_MT}px;
+  margin-bottom: 0px;
 }
 
 phosh-top-panel .indicators {
+  margin-top: 0px;
+  margin-bottom: 0px;
   padding-right: ${PR_LOGICAL}px;
 }
 CSS_EOF

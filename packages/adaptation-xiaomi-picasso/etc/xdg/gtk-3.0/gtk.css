@@ -1,10 +1,21 @@
 #top-bar {
-  min-height: 38px;
-  padding-top: 0px;
-  padding-bottom: 0px;
-  margin-bottom: 16px;
+  min-height: 48px;
+  padding: 0px;
+  margin: 0px;
+}
+
+#top-bar label {
+  margin-top: -12px;
+  margin-bottom: 0px;
+}
+
+#top-bar image {
+  margin-top: -9px;
+  margin-bottom: 0px;
 }
 
 phosh-top-panel .indicators {
-  padding-right: 92px;
+  margin-top: 0px;
+  margin-bottom: 0px;
+  padding-right: 115px;
 }
