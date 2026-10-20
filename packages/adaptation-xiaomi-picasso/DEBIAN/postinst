@@ -86,6 +86,8 @@ udevadm control --reload-rules 2>/dev/null || true
 udevadm trigger --subsystem-match=video4linux 2>/dev/null || true
 chmod 0600 /dev/video32 /dev/video33 /dev/video34 2>/dev/null || true
 cp /usr/lib/droidian/device/droidian-camera.conf /etc/droidian-camera.conf 2>/dev/null || true
+chmod 755 /usr/libexec/flashlightd 2>/dev/null || true
+systemctl --user -M droidian@.host restart org.droidian.Flashlightd.service 2>/dev/null || true
 
 # Configure libdroid_fix for direct brightness control
 if ! grep -qs "/usr/local/lib/libdroid_fix.so" /etc/ld.so.preload 2>/dev/null; then

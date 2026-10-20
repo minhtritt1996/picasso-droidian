@@ -1,0 +1,8 @@
+#!/bin/bash
+set -e
+
+if [ "$1" = "install" ] || [ "$1" = "upgrade" ]; then
+    dpkg-divert --package adaptation-xiaomi-picasso --divert /usr/libexec/flashlightd.orig --rename /usr/libexec/flashlightd 2>/dev/null || true
+fi
+
+exit 0

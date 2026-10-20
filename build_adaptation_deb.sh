@@ -17,8 +17,8 @@ fi
 # Android init skips group/other-writable vendor rc files as insecure.
 find "$PKG_DIR" -type d -exec chmod 755 {} +
 find "$PKG_DIR" -type f -exec chmod 644 {} +
-chmod 755 "$PKG_DIR/DEBIAN/postinst"
-find "$PKG_DIR/usr/local/bin" "$PKG_DIR/usr/bin" -type f -exec chmod 755 {} + 2>/dev/null || true
+chmod 755 "$PKG_DIR/DEBIAN/postinst" "$PKG_DIR/DEBIAN/preinst" "$PKG_DIR/DEBIAN/postrm" 2>/dev/null || true
+find "$PKG_DIR/usr/local/bin" "$PKG_DIR/usr/bin" "$PKG_DIR/usr/libexec" -type f -exec chmod 755 {} + 2>/dev/null || true
 
 VERSION=$(grep '^Version:' "$PKG_DIR/DEBIAN/control" | awk '{print $2}')
 [ -n "$VERSION" ] || VERSION="1.1.0"

@@ -1,0 +1,8 @@
+#!/bin/bash
+set -e
+
+if [ "$1" = "remove" ]; then
+    dpkg-divert --package adaptation-xiaomi-picasso --rename --remove /usr/libexec/flashlightd 2>/dev/null || true
+fi
+
+exit 0
